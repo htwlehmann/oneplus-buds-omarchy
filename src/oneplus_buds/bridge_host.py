@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import signal
 import sys
+import traceback
 from collections.abc import Callable
 from threading import Event, Lock, Thread
 from typing import Protocol, TextIO
@@ -54,6 +55,11 @@ class BridgeProcessHost:
     def _run_bridge(self) -> None:
         try:
             self.bridge.run(self.cancelled)
+        except Exception:
+            # Local fork: keep the traceback in the helper log. The process
+            # still exits, and the panel restarts it with a backoff.
+            traceback.print_exc()
+            raise
         finally:
             self.cancelled.set()
 

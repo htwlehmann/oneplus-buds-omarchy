@@ -1,10 +1,28 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+# Local fork addition: the shell only shows a generic "backend reported an
+# error" line, which hides the traceback of a crashed helper. Duplicate the
+# stderr file descriptor into a local log file so a crash can be diagnosed
+# afterwards. stdout stays untouched: it carries the JSON bridge protocol.
+_LOG = Path(os.environ.get(
+    "ONEPLUS_BUDS_BRIDGE_LOG",
+    Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    / "oneplus-buds" / "bridge.log",
+))
+try:
+    _LOG.parent.mkdir(parents=True, exist_ok=True)
+    _handle = open(_LOG, "a", encoding="utf-8", buffering=1)
+    os.dup2(_handle.fileno(), 2)
+    os.write(2, f"--- helper start pid={os.getpid()} ---\n".encode())
+except OSError:
+    pass
 
 from oneplus_buds.bridge_host import main
 

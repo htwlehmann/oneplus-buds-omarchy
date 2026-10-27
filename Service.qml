@@ -11,6 +11,11 @@ Item {
   property int nextRequestId: 1
   property bool stopping: false
   property var lifecycleObservations: []
+  // Local fork: the helper is a child process that can die (a driver error,
+  // a vanished D-Bus object, a killed process). The panel restarts it with a
+  // backoff instead of staying dead until the shell is reloaded.
+  property int restartAttempt: 0
+  property int restartDelayMs: 1000
 
   function observeLifecycle(phase, productId) {
     lifecycleObservations = lifecycleObservations.concat([{
@@ -37,6 +42,15 @@ Item {
     }
   }
 
+  // Local fork: restart the helper after an unexpected exit.
+  function scheduleHelperRestart() {
+    if (stopping) return
+    restartAttempt += 1
+    restartDelayMs = Math.min(restartDelayMs * 2, 30000)
+    restartTimer.interval = restartDelayMs
+    restartTimer.restart()
+  }
+
   function handleLine(line) {
     var parsed = BridgeModel.parseLine(line)
     if (!parsed.ok) {
@@ -52,6 +66,11 @@ Item {
     state = BridgeModel.applyMessage(state, parsed.message)
     if (state.connection !== previous.connection)
       observeLifecycle("frontend_" + state.connection, null)
+    // A working connection resets the restart backoff.
+    if (state.connection === "connected" && previous.connection !== "connected") {
+      restartAttempt = 0
+      restartDelayMs = 1000
+    }
     var status = state.snapshot && state.snapshot.status
     var oldStatus = previous.snapshot && previous.snapshot.status
     if (status && state.snapshot.session_connected
@@ -101,7 +120,21 @@ Item {
 
   Component.onDestruction: {
     stopping = true
+    restartTimer.stop()
     helper.running = false
+  }
+
+  // Local fork: backoff timer for helper restarts.
+  Timer {
+    id: restartTimer
+    interval: 2000
+    repeat: false
+    onTriggered: {
+      if (!root.stopping) {
+        root.observeLifecycle("frontend_helper_restart", null)
+        root.startHelper()
+      }
+    }
   }
 
   Process {
@@ -132,6 +165,8 @@ Item {
           lastResponse: root.state.lastResponse,
           lastError: root.state.lastError || "Backend process stopped"
         }
+        // Local fork: never stay dead. The helper is restarted with a backoff.
+        root.scheduleHelperRestart()
       }
     }
   }
