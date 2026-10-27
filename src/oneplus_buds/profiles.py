@@ -63,6 +63,20 @@ PRO_2_EQ_PRESETS = (
     EqPresetProfile(7, "hans-zimmer-soundscape-tuning", "Hans Zimmer Soundscape Tuning"),
 )
 
+# The Nord Buds 3 Pro answers the native EQ selection with seven factory IDs
+# (0..6). The device returns an empty catalogue for 0x0122, so it publishes no
+# names of its own; the display names below are the owner's app labels and stay
+# generic until the phone app names are confirmed for this firmware.
+NORD_BUDS_3_PRO_EQ_PRESETS = (
+    EqPresetProfile(0, "preset-1", "Preset 1"),
+    EqPresetProfile(1, "preset-2", "Preset 2"),
+    EqPresetProfile(2, "preset-3", "Preset 3"),
+    EqPresetProfile(3, "preset-4", "Preset 4"),
+    EqPresetProfile(4, "preset-5", "Preset 5"),
+    EqPresetProfile(5, "preset-6", "Preset 6"),
+    EqPresetProfile(6, "preset-7", "Preset 7"),
+)
+
 
 @dataclass(frozen=True)
 class DeviceProfile:
@@ -140,6 +154,42 @@ PROFILES = {
                 "custom_eq",
             }
         ),
+        compatibility="verified",
+    ),
+    "064414": DeviceProfile(
+        product_id="064414",
+        name="OnePlus Nord Buds 3 Pro",
+        service_uuid="0000079a-d102-11e1-9b23-00025b00a5a5",
+        anc=AncProfile(
+            write_indices={
+                "off": 0,
+                "on": 1,
+                "transparency": 2,
+                "deep": 4,
+                "medium": 5,
+                "light": 6,
+            },
+            read_modes={0: "off", 1: "on", 2: "transparency"},
+            read_levels={4: "deep", 5: "medium", 6: "light"},
+            sequences={"off": 0x40},
+        ),
+        eq=EqProfile(NORD_BUDS_3_PRO_EQ_PRESETS, supports_custom=False, write_verified=True,
+                     custom_write_verified=False),
+        capabilities=frozenset(
+            {
+                "battery",
+                "case_battery",
+                "firmware",
+                "anc",
+                "transparency",
+                "anc_levels",
+                "eq",
+            }
+        ),
+        # Owner-verified on real hardware: see
+        # docs/devices/oneplus-nord-buds-3-pro.md. The ANC bitmap and the seven
+        # factory EQ IDs were measured on this unit, not copied from another
+        # model.
         compatibility="verified",
     ),
 }

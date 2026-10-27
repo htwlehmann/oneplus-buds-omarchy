@@ -6,14 +6,17 @@ Compatibility describes evidence, not a promise that every firmware works.
 |---|---|---|---|
 | OnePlus Buds Pro | `060C14` | Verified | [Device record](oneplus-buds-pro.md) |
 | OnePlus Buds Pro 2 | `062014` | Verified | [Device record](oneplus-buds-pro-2.md) |
+| OnePlus Nord Buds 3 Pro | `064414` | Verified (owner) | [Device record](oneplus-nord-buds-3-pro.md) |
 | Other compatible OnePlus/OPO products | Unknown | Experimental if discovered | No maintainer verification |
 
 There are no community-tested models recorded yet. **Verified** means maintainer
 hardware testing on the two reference devices and their recorded firmware.
-**Community Tested** means a device owner has supplied reproducible evidence that
-the advertised functions work on that model. **Experimental** means recognised
-protocol/service evidence without that device evidence. Community testing never
-upgrades a model to maintainer-verified status.
+**Verified (owner)** means the plugin owner measured the model on their own
+hardware and recorded the evidence in a device record; upstream has no
+maintainer verification for it. **Community Tested** means a device owner has
+supplied reproducible evidence that the advertised functions work on that model.
+**Experimental** means recognised protocol/service evidence without that device
+evidence. Community testing never upgrades a model to maintainer-verified status.
 Community Tested is an evidence label; write controls remain gated to
 maintainer-hardware-verified profiles.
 
@@ -35,6 +38,11 @@ Both reference profiles expose component battery, case battery when returned,
 firmware, ANC, transparency and ANC strengths. Pro supports Light/Deep/Smart;
 Pro 2 also supports Medium. Main On does not reliably preserve the visible strength.
 Case presence and charging flags need further deliberate edge-case testing.
+
+The owner-verified Nord Buds 3 Pro (`064414`) shares the Pro 2 ANC bitmap but has
+no Smart strength: the device acknowledges byte `80` without applying it. It
+answers the native EQ catalogue query with an empty list, so it offers the seven
+factory EQ slots without names, band definitions or custom curves.
 
 Both reference models have hardware-verified native factory EQ selection. Buds Pro
 uses Balanced, Deep Sea Bass, Pure Vocals, and Bright & Crisp. Buds Pro 2 firmware

@@ -73,7 +73,7 @@ class BridgeTests(unittest.TestCase):
         self.assertFalse(any(
             profile.compatibility == "verified"
             for product_id, profile in PROFILES.items()
-            if product_id not in {"060C14", "062014"}
+            if product_id not in {"060C14", "062014", "064414"}
         ))
 
     def test_unknown_recognised_product_is_experimental(self):

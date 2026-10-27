@@ -22,6 +22,7 @@ independent project, unaffiliated with OnePlus or OPPO.
 |---|---|---|---|
 | OnePlus Buds Pro | Verified on hardware | 541.541.510 | Light, Deep, Smart |
 | OnePlus Buds Pro 2 | Verified on hardware | 196.196.101 | Light, Medium, Deep, Smart |
+| OnePlus Nord Buds 3 Pro | Verified on owner hardware | 155.155.101 | Light, Medium, Deep |
 | Other compatible OnePlus/OPO devices | Experimental if recognised; no verified controls | Unknown | Not exposed |
 
 See [compatibility and limitations](docs/devices/compatibility.md). Gestures,
@@ -34,6 +35,12 @@ by the maintainer. Other recognised OnePlus/OPO-compatible models are
 **Experimental** until tested. A model may become **Community Tested** after an
 owner reports successful, reproducible checks on their own hardware; that label
 does not mean maintainer hardware verification.
+
+This local fork additionally carries an owner-verified profile for the
+**OnePlus Nord Buds 3 Pro** (`064414`), measured on the owner's own unit. Its ANC
+bitmap matches the Buds Pro 2, but it has no Smart strength and publishes an
+empty native EQ catalogue, so only the seven factory EQ slots are offered. See
+the [device record](docs/devices/oneplus-nord-buds-3-pro.md).
 
 Every connected device has a quiet reporting link at the bottom of the control
 panel. Verified and Community Tested devices show **Report a problem**;

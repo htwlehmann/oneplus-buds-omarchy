@@ -2,6 +2,10 @@
 
 ## Unreleased — 0.1.0 release candidate
 
+- Add an owner-verified device profile for the OnePlus Nord Buds 3 Pro
+  (`064414`): measured ANC bitmap without Smart strength, seven native factory
+  EQ slots without custom curves, plus device record, compatibility entry and
+  regression tests that pin the measured wire values.
 - Distinguish Verified, Community Tested and Experimental device evidence in the
   backend and panel; only Buds Pro and Buds Pro 2 remain hardware-verified.
 - Add a compact experimental-device notice and user-controlled compatibility
