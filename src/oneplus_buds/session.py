@@ -10,6 +10,7 @@ from .timing import AncRequestError, PhaseTimer
 from .profiles import DeviceProfile, profile_for_product
 from .protocol import (
     HELLO,
+    NOTIFY_FEATURE_SWITCHES,
     NOTIFY_STATE,
     QUERY_BROADCAST_CODES,
     QUERY_CAPABILITIES,
@@ -111,6 +112,14 @@ class OpoSession:
             with span("query", command=QUERY_BATTERY):
                 battery = parse_battery(transport.request(
                     QUERY_BATTERY, b"", RESPONSE_BATTERY, on_frames=received.extend))
+            if battery is None:
+                raise RuntimeError("essential device state is not available")
+            if "case_battery" not in profile.capabilities:
+                # Some cases report a placeholder component without a real
+                # battery. The phone app hides the case level for those models,
+                # so the plugin must not show a misleading zero either.
+                battery = {name: value for name, value in battery.items()
+                           if name != "case"}
             with span("query", command=QUERY_ANC):
                 anc = parse_anc_state(transport.request(
                     QUERY_ANC, b"\x01\x01", RESPONSE_ANC, on_frames=received.extend), profile.anc)
@@ -295,6 +304,16 @@ class OpoSession:
         target_id, target_name = self._resolve_eq_target(preset, before)
         events = list(initial.events)
         ignored = initial.ignored_frames
+
+        # Some device families select a custom curve by writing it, not with
+        # the plain preset command: the plain command only switches the
+        # factory presets. Writing the unchanged curve back selects the custom
+        # entry without altering the sound.
+        custom = next((item for item in before.custom_entries
+                       if item.eq_id == target_id), None)
+        if custom is not None:
+            return self.set_custom_eq(
+                custom.eq_id, tuple(band.gain_db for band in custom.bands))
 
         def collect(frames: list[Frame]) -> None:
             nonlocal ignored
@@ -613,6 +632,25 @@ class OpoSession:
                 for feature, name in FEATURE_SWITCH_NAMES.items()
                 if feature in switches
             }
+            return SafeEvent("feature_switches", named)
+        if frame.command == NOTIFY_FEATURE_SWITCHES:
+            # The device pushes changed feature switches as
+            # [count][feature id, value...]. This is how a change made in the
+            # phone app reaches the panel.
+            if len(frame.payload) < 2:
+                return None
+            count = frame.payload[0]
+            if len(frame.payload) < 2 + count * 2:
+                return None
+            named = {}
+            for offset in range(count):
+                feature = frame.payload[2 + offset * 2]
+                value = frame.payload[3 + offset * 2]
+                if value not in (0, 1):
+                    return None
+                name = FEATURE_SWITCH_NAMES.get(feature)
+                if name is not None:
+                    named[name] = bool(value)
             return SafeEvent("feature_switches", named)
         if frame.command == NOTIFY_STATE and frame.payload:
             # The device pushes the noise mode as [event, type, type, bitmap].

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from time import monotonic
 from threading import RLock
 from typing import cast
 
@@ -34,6 +35,7 @@ class BudsController:
         self._generation = 0
         self._eq_status: EqStatusResult | None = None
         self._bass_level: int | None = None
+        self._last_state_refresh: float = 0.0
 
     def start(self) -> ControllerSnapshot:
         with self._lock:
@@ -231,7 +233,42 @@ class BudsController:
                 return self.refresh()
             else:
                 self._apply_batch(batch)
+                self._refresh_phone_app_state()
             return self.snapshot()
+
+    def _refresh_phone_app_state(self) -> None:
+        """Re-read the state the phone app owns.
+
+        The device pushes most changes, but a change made in the phone app
+        while the earbuds sleep may only reach the device later. A slow
+        refresh keeps the panel in sync without waiting for the next push.
+        """
+        if self._session is None:
+            return
+        now = monotonic()
+        if now - self._last_state_refresh < 5.0:
+            return
+        self._last_state_refresh = now
+        profile = profile_for_product(self._status.product_id) if self._status else None
+        if profile is None:
+            return
+        try:
+            if "feature_switches" in profile.capabilities:
+                switches = cast(OpoSession, self._session).feature_switches(
+                    tuple(FEATURE_SWITCH_NAMES))
+                self._feature_switches.update({
+                    name: switches[feature_id]
+                    for feature_id, name in FEATURE_SWITCH_NAMES.items()
+                    if feature_id in switches
+                })
+            if "bass_engine" in profile.capabilities:
+                _minimum, _maximum, current = cast(OpoSession, self._session).bass_engine_status()
+                self._bass_level = current
+        except (OSError, RuntimeError):
+            # The next poll or reconnect recovers; a failed refresh must not
+            # break the session.
+            return
+        self._generation += 1
 
     def shutdown(self) -> ControllerSnapshot:
         with self._lock:
@@ -350,6 +387,26 @@ class BudsController:
             self._session.__exit__(None, None, None)
             self._session = None
 
+    def _apply_eq_change(self, eq_id: object) -> None:
+        """Follow an equalizer change that the phone app made on the device."""
+        if not isinstance(eq_id, int) or self._eq_status is None:
+            return
+        profile = profile_for_product(self._eq_status.product_id)
+        preset = None
+        if profile is not None and profile.eq is not None:
+            preset = next((item for item in profile.eq.presets
+                           if item.eq_id == eq_id), None)
+        custom = next((entry for entry in self._eq_status.custom_entries
+                       if entry.eq_id == eq_id), None)
+        if preset is not None:
+            name, kind = preset.name, "factory"
+        elif custom is not None:
+            name, kind = custom.name, "custom"
+        else:
+            name, kind = f"Unknown ({eq_id})", "unknown"
+        self._eq_status = replace(
+            self._eq_status, current_id=eq_id, current_name=name, current_kind=kind)
+
     def _apply_batch(self, batch: EventBatch) -> None:
         self._ignored_frames += batch.ignored_frames
         for event in batch.events:
@@ -376,6 +433,8 @@ class BudsController:
                 level = event.data.get("level")
                 if isinstance(level, int):
                     self._bass_level = level
+            elif event.kind == "eq_changed":
+                self._apply_eq_change(event.data.get("id"))
             elif event.kind == "notification":
                 code = event.data.get("event_code")
                 if isinstance(code, int):

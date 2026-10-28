@@ -64,7 +64,7 @@ class NordBuds3ProProfileTests(unittest.TestCase):
         self.assertEqual(self.profile.anc.payload_for("medium"), b"\x01\x01\x20")
         self.assertEqual(self.profile.anc.payload_for("light"), b"\x01\x01\x40")
 
-    def test_native_eq_exposes_the_three_app_presets_without_custom_bands(self) -> None:
+    def test_native_eq_exposes_the_three_app_presets_and_custom_curves(self) -> None:
         eq = self.profile.eq
         self.assertIsNotNone(eq)
         assert eq is not None
@@ -77,20 +77,20 @@ class NordBuds3ProProfileTests(unittest.TestCase):
             ["Ausgewogen (Standard)", "Serenade", "Bass"],
         )
         self.assertTrue(eq.write_verified)
-        self.assertFalse(eq.supports_custom)
-        self.assertFalse(eq.custom_write_verified)
+        self.assertTrue(eq.supports_custom)
+        self.assertTrue(eq.custom_write_verified)
 
     def test_capabilities_match_the_measured_features(self) -> None:
         self.assertEqual(
             self.profile.capabilities,
             frozenset({
                 "battery",
-                "case_battery",
                 "firmware",
                 "anc",
                 "transparency",
                 "anc_levels",
                 "eq",
+                "custom_eq",
                 "bass_engine",
                 "feature_switches",
                 "find_earbuds",
