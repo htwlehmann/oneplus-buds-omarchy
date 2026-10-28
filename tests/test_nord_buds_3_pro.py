@@ -95,6 +95,7 @@ class NordBuds3ProProfileTests(unittest.TestCase):
                 "feature_switches",
                 "find_earbuds",
                 "touch_controls",
+                "hold_cycle",
             }),
         )
 
@@ -103,6 +104,16 @@ class NordBuds3ProProfileTests(unittest.TestCase):
             1: (0, 1), 2: (0, 1, 2, 3, 5, 6, 17),
             3: (0, 2, 3, 5, 6, 17), 6: (0, 11, 12),
         })
+
+    def test_shared_hold_cycle_pins_the_four_hardware_verified_masks(self) -> None:
+        from oneplus_buds.touch import hold_cycle_mask, parse_hold_cycle
+        from oneplus_buds.protocol import Frame
+        self.assertTrue(self.profile.hold_cycle_supported)
+        self.assertEqual(hold_cycle_mask(("anc", "off")), 3)
+        self.assertEqual(hold_cycle_mask(("off", "transparency")), 5)
+        self.assertEqual(hold_cycle_mask(("anc", "transparency")), 6)
+        self.assertEqual(hold_cycle_mask(("anc", "off", "transparency")), 7)
+        self.assertEqual(parse_hold_cycle(Frame(0x810C, 1, bytes.fromhex("00 02 01 06"))), 6)
 
 
 if __name__ == "__main__":

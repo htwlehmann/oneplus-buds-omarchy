@@ -12,7 +12,7 @@ from .models import ControllerSnapshot, ControlResult, EqControlResult, EqStatus
 from .profiles import profile_for_product
 from .protocol import FEATURE_SWITCH_NAMES, VersionRecord
 from .session import OpoSession, UnsupportedProductError
-from .touch import TouchBinding
+from .touch import TouchBinding, hold_cycle_mask
 from .timing import AncRequestError, PhaseTimer
 
 
@@ -38,6 +38,7 @@ class BudsController:
         self._eq_status: EqStatusResult | None = None
         self._bass_level: int | None = None
         self._touch_bindings: tuple[TouchBinding, ...] = ()
+        self._hold_cycle_mask: int | None = None
         self._last_state_refresh: float = 0.0
 
     def start(self) -> ControllerSnapshot:
@@ -299,11 +300,30 @@ class BudsController:
                 self.refresh()
             try:
                 self._touch_bindings = cast(OpoSession, self._session).touch_bindings()
+                profile = profile_for_product(self._status.product_id) if self._status else None
+                self._hold_cycle_mask = cast(OpoSession, self._session).read_hold_cycle() if (
+                    profile and profile.hold_cycle_supported) else None
             except (OSError, RuntimeError):
                 self._close_session()
                 self._generation += 1
                 raise
             self._generation += 1
+
+    def set_hold_cycle(self, modes: tuple[str, ...]) -> dict[str, object]:
+        target = hold_cycle_mask(modes)
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            try:
+                status, actual = cast(OpoSession, self._session).set_hold_cycle(modes)
+            except (OSError, RuntimeError):
+                self._close_session()
+                self._generation += 1
+                raise
+            self._hold_cycle_mask = actual
+            self._generation += 1
+            return {"set_status": status, "verified": status in (None, 0) and actual == target}
 
     def set_touch_control(self, side: int, action: int, function: int) -> dict[str, object]:
         with self._lock:
@@ -427,6 +447,7 @@ class BudsController:
                 eq_status=self._eq_status,
                 bass_level=self._bass_level,
                 touch_bindings=self._touch_bindings,
+                hold_cycle_mask=self._hold_cycle_mask,
             )
 
     def _connect_session(self) -> None:
@@ -445,6 +466,7 @@ class BudsController:
 
     def _close_session(self) -> None:
         self._touch_bindings = ()
+        self._hold_cycle_mask = None
         if self._session is not None:
             self._session.__exit__(None, None, None)
             self._session = None

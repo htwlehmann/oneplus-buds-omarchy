@@ -141,3 +141,4 @@ class ControllerSnapshot:
     eq_status: EqStatusResult | None = None
     bass_level: int | None = None
     touch_bindings: tuple[TouchBinding, ...] = ()
+    hold_cycle_mask: int | None = None

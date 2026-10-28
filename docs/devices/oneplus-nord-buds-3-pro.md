@@ -129,7 +129,7 @@ Each write is verified with a fresh correlated `0x0108`, never just the ACK.
 | Single tap | 1 | None (0) | 0, 1 |
 | Double tap | 2 | Next track (6) | 0, 1, 2, 3, 5, 6, 17 |
 | Triple tap | 3 | Previous track (5) | 0, 2, 3, 5, 6, 17 |
-| Touch & hold | 4 | Switch noise control (8) | Display only |
+| Touch & hold | 4 | Switch noise control (8) | Shared cycle editor below |
 | Long hold | 6 | None (0) | 0, 11, 12 |
 
 Functions: 0 none, 1 play/pause, 2 play music, 3 voice assistant, 5 previous
@@ -140,9 +140,8 @@ does not prove its action is implemented by every connected audio host.
 The model table's support masks are 516 (single), 8807 (double), 8803 (triple)
 and 536 (long hold). They describe app function bits, **not** wire function
 IDs. `EarphoneUtils` (`model/repository/earphone/I.java`) maps app action 11
-to wire action 4. That fixed noise-control action and the separate call
-gestures are not changed by this implementation; configuring the noise-mode
-cycle would require another command and its own measurements.
+to wire action 4. Its function stays noise control; the modes included in its
+shared cycle are configurable separately (see below). Call gestures are unchanged.
 
 All 36 allowed side/action/function combinations were written, acknowledged
 with status `00`, and confirmed by a fresh query through the running plugin
@@ -154,6 +153,53 @@ is in `docs/measurements/2026-10-28-nord-touch.json` and regressions are in
 The panel reads assignments on opening and offers Refresh for changes made
 in the phone app. Failed or uncertain reads invalidate the table and require
 a successful fresh read before editing again. No write is retried.
+
+### Shared Touch & hold noise-mode cycle
+
+The decrypted model table has no `longPressType` override (default 0), and its
+hold entry has `showEar=1`. `control/a.java:w()` in the decompiled phone app
+constructs `NoiseReductionInfoDTO(2, 1, bitmap)` for that case. The OnePlus
+branch in `p079fb/z0.java` sets the minimum selection count to two.
+`NoiseReductionInfo.getData()` encodes action/type followed by the bitmap;
+`HeadsetCoreService.i1()` sends that object using command 1028 (`0x0404`).
+
+| Operation | Command | Payload |
+|---|---|---|
+| Query saved cycle | `0x010c` | `02 01` |
+| Query response | `0x810c` | `00 02 01 <mask>` |
+| Write saved cycle | `0x0404` | `02 01 <mask>` |
+| Write acknowledgement | `0x8404` | `00` |
+
+This is **not** command `0x0402`, and it must not be confused with the current
+ANC command: that uses action 1 (`01 01 <current mode>`). Cycle action 2 does
+not select a current ANC level.
+
+Off is bit0 (`01`), noise cancellation bit1 (`02`), transparency bit2 (`04`).
+All four app-valid combinations were written through the running plugin,
+acknowledged with status 00 and confirmed with a fresh correlated query:
+
+| Included modes | Mask |
+|---|---|
+| Noise cancellation + Off | `03` |
+| Off + Transparency | `05` |
+| Noise cancellation + Transparency | `06` |
+| All three | `07` |
+
+The original mask `06` was restored in a finally block, then read back. All ten
+ordinary touch assignments were compared before/after and remained identical.
+Address-free evidence: `docs/measurements/2026-10-28-nord-hold-cycle.json`.
+The physical press-and-hold gesture was not automated; these measurements
+verify stored configuration and protocol replies, with gesture semantics
+corroborated by the phone app.
+
+The panel offers one shared checkbox editor for both earbuds inside the
+collapsed Touch controls section, with explicit Apply/Cancel and minimum two
+choices. Unsaved changes survive ordinary snapshot updates and folding;
+failed verification restores the actual readback. Invalid read masks (including
+fewer than two bits), malformed ACKs and lost readbacks invalidate the state.
+
+Custom EQ is a lightly indented subsection under Earbud EQ, after presets and
+before BassWave. Both disclosures start closed every time the panel opens.
 
 ## Comparison with the upstream reference models
 

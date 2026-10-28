@@ -121,6 +121,10 @@ Item {
     })
   }
 
+  function setHoldCycle(modes) {
+    return request("set_hold_cycle", {modes: modes})
+  }
+
   function setFeatureSwitch(feature, enabled) {
     return request("set_feature_switch", {
       feature: String(feature || ""),

@@ -13,7 +13,7 @@ from .timing import AncRequestError
 from .models import ControllerSnapshot, ControlResult, EqControlResult
 from .profiles import compatibility_for_product, profile_for_product
 from .protocol import FEATURE_SWITCH_NAMES
-from .touch import serialize_touch_controls
+from .touch import serialize_touch_controls, serialize_hold_cycle
 from .report import build_snapshot_report, write_report
 from .service import BudsServiceRunner, ServiceState
 
@@ -57,6 +57,9 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         "bass_level": snapshot.bass_level,
         "touch_controls": serialize_touch_controls(
             snapshot.touch_bindings, profile.touch_functions if profile else {},
+            bool(profile and profile.verified and snapshot.session_connected)),
+        "hold_cycle": serialize_hold_cycle(
+            snapshot.hold_cycle_mask if profile and profile.hold_cycle_supported else None,
             bool(profile and profile.verified and snapshot.session_connected)),
     }
 
@@ -194,6 +197,13 @@ class BudsFrontendBridge:
                 snapshot = self.controller.snapshot()
                 result = {"touch_controls": serialize_snapshot(snapshot)["touch_controls"]}
                 self._on_snapshot(snapshot)
+            elif command == "set_hold_cycle":
+                self._require_parameters(command, params, {"modes"})
+                modes = params["modes"]
+                if not isinstance(modes, list) or any(not isinstance(value, str) for value in modes):
+                    raise ValueError("set_hold_cycle parameter 'modes' must be a string array")
+                result = self.controller.set_hold_cycle(tuple(modes))
+                self._on_snapshot(self.controller.snapshot())
             elif command == "set_touch_control":
                 self._require_parameters(command, params, {"side", "action", "function"})
                 for key in ("side", "action", "function"):
@@ -265,7 +275,7 @@ class BudsFrontendBridge:
                 error={"code": "invalid_parameters", "message": self._safe_error(error)},
             )
         except (OSError, RuntimeError) as error:
-            if command in ("touch_controls", "set_touch_control"):
+            if command in ("touch_controls", "set_touch_control", "set_hold_cycle"):
                 self._on_snapshot(self.controller.snapshot())
             self._remember_error(error)
             return self._response(

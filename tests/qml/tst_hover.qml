@@ -15,6 +15,7 @@ TestCase {
   property int reportRequests: 0
   property string reportPath: ""
   property var touchRequest: null
+  property var holdCycleRequest: null
   property var queuedRequests: []
   function request(command, params) {
    queuedRequests = queuedRequests.concat([{command:command, parameters:params}])
@@ -23,6 +24,9 @@ TestCase {
   }
   function setTouchControl(side, action, value) {
    touchRequest = {side:side, action:action, function:value}; return nextId++
+  }
+  function setHoldCycle(modes) {
+   holdCycleRequest = modes.slice(); return nextId++
   }
   function eqStatus() { eqStatusCalls++; return nextId++ }
   function setEq(value) { return nextId++ }
@@ -56,6 +60,7 @@ TestCase {
   service.reportRequests = 0
   service.reportPath = ""
   service.touchRequest = null
+  service.holdCycleRequest = null
   service.queuedRequests = []
   widget.panelQueue = []
   host.panelAvailableWidth = 600
@@ -168,9 +173,77 @@ TestCase {
   wait(220)
   compare(widget.width, compact)
  }
+ function test_hold_cycle_is_shared_validated_and_applied_explicitly() {
+  var state = touchSnapshot()
+  state.capabilities.push("hold_cycle")
+  state.hold_cycle = {modes:["anc","transparency"],min_selected:2,shared:true,writable:true,
+   options:[{value:"anc",label:"Noise cancellation"},{value:"off",label:"Off"},
+    {value:"transparency",label:"Transparency"}]}
+  service.snapshot = state
+  widget.popupOpen = true
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  wait(0)
+  var apply = findChild(widget, "applyHoldCycle")
+  var anc = findChild(widget, "holdCycleOption_anc")
+  var off = findChild(widget, "holdCycleOption_off")
+  var transparency = findChild(widget, "holdCycleOption_transparency")
+  verify(apply !== null)
+  verify(!apply.visible)
+  findChild(widget, "touchControlsDisclosure").clicked()
+  wait(0)
+  verify(anc.visible && off.visible && transparency.visible)
+  verify(anc.checked)
+  verify(!off.checked)
+  verify(transparency.checked)
+  verify(!apply.enabled)
+  verify(findChild(widget, "touchSelector_1_4") === null)
+  anc.clicked()
+  verify(!apply.enabled)  // only one mode
+  off.clicked()
+  verify(apply.enabled)
+  compare(service.holdCycleRequest, null)
+  service.snapshot = JSON.parse(JSON.stringify(state))  // ordinary poll preserves draft
+  wait(0)
+  verify(!anc.checked && off.checked && transparency.checked)
+  findChild(widget, "touchControlsDisclosure").clicked()
+  findChild(widget, "touchControlsDisclosure").clicked()
+  verify(!anc.checked && off.checked && transparency.checked)
+  apply.clicked()
+  compare(service.holdCycleRequest.join(","), "off,transparency")
+  verify(!apply.enabled)
+  verify(!anc.enabled)
+  state.hold_cycle.modes = ["off","transparency"]
+  service.snapshot = JSON.parse(JSON.stringify(state))
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:true}}
+  wait(0)
+  verify(!apply.enabled)
+  verify(!anc.checked && off.checked && transparency.checked)
+  anc.clicked()
+  verify(apply.enabled)
+  findChild(widget, "cancelHoldCycle").clicked()
+  verify(!anc.checked)
+  verify(!apply.enabled)
+  anc.clicked()
+  apply.clicked()
+  // An ignored write restores the actual device state, never the draft.
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:false}}
+  wait(0)
+  verify(!anc.checked && off.checked && transparency.checked)
+  verify(!apply.enabled)
+  verify(widget.outcome.indexOf("not confirmed") !== -1)
+  off.forceActiveFocus()
+  verify(off.activeFocus)
+  findChild(widget, "touchControlsDisclosure").clicked()
+  verify(!off.activeFocus)
+  findChild(widget, "touchControlsDisclosure").clicked()
+  service.connection = "disconnected"
+  wait(0)
+  verify(!off.enabled)
+  verify(!apply.enabled)
+ }
  function test_disclosures_default_closed_independent_and_keep_edits() {
   var state = touchSnapshot()
-  state.capabilities.push("eq")
+  state.capabilities.push("eq", "bass_engine")
   state.custom_eq_write_verified = true
   state.eq = {current_id:7,current_name:"My curve",gain_step_db:1,
    presets:[{id:3,key:"balanced",name:"Balanced"}],
@@ -192,6 +265,10 @@ TestCase {
   verify(!touch.visible)
   verify(findChild(widget, "currentEqLabel").visible)
   compare(findChild(widget, "currentEqLabel").text, "Current: My curve")
+  var bass = findChild(widget, "bassWaveSection")
+  verify(bass !== null)
+  verify(customHeader.mapToItem(widget, 0, 0).y < bass.mapToItem(widget, 0, 0).y)
+  verify(customHeader.mapToItem(widget, 0, 0).x > findChild(widget, "currentEqLabel").mapToItem(widget, 0, 0).x)
   var compactHeight = widget.panelHeight
   var fixedWidth = widget.contentWidth
   customHeader.clicked()

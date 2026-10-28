@@ -69,7 +69,7 @@ from .protocol import (
 )
 from .transport import RfcommTransport
 from .protocol import QUERY_TOUCH, RESPONSE_TOUCH, SET_TOUCH, RESPONSE_SET_TOUCH
-from .touch import TouchBinding, parse_touch_bindings
+from .touch import TouchBinding, parse_touch_bindings, HOLD_CYCLE_QUERY, hold_cycle_mask, parse_hold_cycle
 
 
 class UnsupportedProductError(RuntimeError):
@@ -484,6 +484,33 @@ class OpoSession:
             setup.events + received.events,
             setup.ignored_frames + received.ignored_frames,
         )
+
+    def read_hold_cycle(self) -> int:
+        self._require_connected()
+        if not self.profile.hold_cycle_supported:
+            raise ValueError("hold cycle is not supported by this device profile")
+        frame = self._transport.request(QUERY_ANC, HOLD_CYCLE_QUERY, RESPONSE_ANC)
+        try:
+            return parse_hold_cycle(frame)
+        except ValueError as error:
+            raise RuntimeError(str(error)) from error
+
+    def set_hold_cycle(self, modes: tuple[str, ...]) -> tuple[int | None, int]:
+        self._require_connected()
+        if not self._authenticated:
+            raise RuntimeError("session authentication has not completed")
+        if not self.profile.verified or not self.profile.hold_cycle_supported:
+            raise ValueError("hold cycle writes are not verified for this device profile")
+        mask = hold_cycle_mask(modes)
+        self.read_hold_cycle()  # require valid current state before writing
+        try:
+            ack = self._transport.request(SET_ANC, HOLD_CYCLE_QUERY + bytes((mask,)), RESPONSE_SET_ANC)
+            if len(ack.payload) != 1:
+                raise RuntimeError("device returned malformed hold cycle acknowledgement")
+            status = ack.payload[0]
+        except TimeoutError:
+            status = None
+        return status, self.read_hold_cycle()
 
     def touch_bindings(self) -> tuple[TouchBinding, ...]:
         self._require_connected()

@@ -99,3 +99,12 @@ the panel section. Snapshot field `touch_controls` is an array of bindings:
   publishes actual readback. Only sides 1/2 are allowed. Failure to confirm
   yields `verified: false`; transport or malformed-response failures return
   an error and publish an unavailable/empty table. Writes are never retried.
+
+The same refresh reads `hold_cycle` for the verified Nord profile. This is null
+when unavailable, otherwise `{modes, options, min_selected:2, shared:true,
+writable}`. `set_hold_cycle` takes a string array `modes`, e.g.
+`{"modes":["anc","transparency"]}`. At least two distinct known modes are
+required (`anc`, `off`, `transparency`). It writes action2/type1 using the ANC
+command, then publishes actual cycle readback. A rejected/ignored change has
+`verified:false`; malformed/uncertain replies emit unavailable state and return
+an error without retrying the write. This does not change the current ANC mode.

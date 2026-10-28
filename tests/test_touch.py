@@ -26,12 +26,15 @@ class WireTransport:
         self.ignore = ignore
         self.ack = ack
         self.requests = []
+        self.cycle_mask = 6
 
     def __exit__(self, *args):
         pass
 
     def request(self, command, payload, response, **kwargs):
         self.requests.append((command, payload, response))
+        if command == 0x010C and payload == b"\x02\x01":
+            return Frame(0x810C, 1, bytes((0, 2, 1, self.cycle_mask)))
         if command == 0x0108:
             return Frame(0x8108, 1, self.payload)
         if command == 0x0401:

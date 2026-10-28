@@ -97,6 +97,7 @@ class DeviceProfile:
     writable_features: frozenset[str] = frozenset()
     # Wire action -> allowed function IDs. Empty means no touch writes.
     touch_functions: dict[int, tuple[int, ...]] = field(default_factory=dict)
+    hold_cycle_supported: bool = False
 
     @property
     def verified(self) -> bool:
@@ -207,6 +208,7 @@ PROFILES = {
                 "feature_switches",
                 "find_earbuds",
                 "touch_controls",
+                "hold_cycle",
             }
         ),
         # Verified on the owner's hardware: writing these switches changed the
@@ -226,6 +228,7 @@ PROFILES = {
             3: (0, 2, 3, 5, 6, 17),
             6: (0, 11, 12),
         },
+        hold_cycle_supported=True,
         # Owner-verified on real hardware: see
         # docs/devices/oneplus-nord-buds-3-pro.md. The ANC bitmap and the seven
         # factory EQ IDs were measured on this unit, not copied from another

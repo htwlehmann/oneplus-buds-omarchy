@@ -50,6 +50,19 @@ BarWidget {
     && snapshot.capabilities.indexOf("touch_controls") !== -1)
   readonly property var touchControls: snapshot && snapshot.touch_controls
     ? snapshot.touch_controls : []
+  readonly property var holdCycle: snapshot ? snapshot.hold_cycle : null
+  readonly property bool holdCycleAvailable: !!(snapshot && snapshot.capabilities
+    && snapshot.capabilities.indexOf("hold_cycle") !== -1)
+  property var holdCycleDraft: []
+  property bool holdCycleDirty: false
+  readonly property bool holdCycleEditable: !!(holdCycle && holdCycle.writable
+    && connection === "connected" && snapshot && snapshot.session_connected
+    && pendingRequestId < 0)
+  readonly property bool holdCycleDraftValid: !!(holdCycle
+    && holdCycleDraft.length >= holdCycle.min_selected)
+  onHoldCycleChanged: {
+    if (!holdCycle || !holdCycleDirty) resetHoldCycleDraft()
+  }
   // Local fork: the heading is the name the device carries, not a hard coded
   // model name. BlueZ keeps the name the device reports and a separate alias
   // that the user can rename.
@@ -164,6 +177,7 @@ BarWidget {
     if (popupOpen) {
       customEqExpanded = false
       touchControlsExpanded = false
+      resetHoldCycleDraft()
       customSelectionDirty = false
       syncCustomSlotFromEq()
       collapseTimer.stop()
@@ -201,6 +215,34 @@ BarWidget {
   }
 
   function close() { popupOpen = false }
+
+  function resetHoldCycleDraft() {
+    holdCycleDraft = holdCycle && holdCycle.modes ? holdCycle.modes.slice() : []
+    holdCycleDirty = false
+  }
+
+  function toggleHoldCycleMode(mode) {
+    if (!holdCycleEditable) return
+    var draft = holdCycleDraft.slice()
+    var index = draft.indexOf(mode)
+    if (index >= 0) draft.splice(index, 1)
+    else draft.push(mode)
+    // Keep the app's display order for a stable request and comparison.
+    holdCycleDraft = holdCycle.options.map(function(option) { return option.value })
+      .filter(function(value) { return draft.indexOf(value) >= 0 })
+    holdCycleDirty = JSON.stringify(holdCycleDraft) !== JSON.stringify(holdCycle.modes)
+  }
+
+  function applyHoldCycle() {
+    if (!budsService || !holdCycleEditable || !holdCycleDraftValid || !holdCycleDirty) return
+    var requestId = budsService.setHoldCycle(holdCycleDraft.slice())
+    if (requestId === null) return
+    pendingRequestId = requestId
+    pendingKind = "hold_cycle"
+    pendingMode = "hold cycle"
+    outcome = ""
+    requestWatchdog.restart()
+  }
 
   function refreshTouchControls() {
     if (!touchControlsAvailable || connection !== "connected" || pendingRequestId >= 0) return
@@ -434,6 +476,7 @@ BarWidget {
     pendingMode = ""
     var completedKind = pendingKind
     pendingKind = ""
+    if (completedKind === "hold_cycle") resetHoldCycleDraft()
     // Local fork: continue the startup queue (feature switches, bass level).
     sendNextPanelRequest()
     if (completedKind === "diagnostic_report") {
@@ -459,7 +502,9 @@ BarWidget {
       syncCustomSlotFromEq()
     }
     if (response.ok === true) {
-      if (completedKind === "touch_write" && (!response.result || response.result.verified !== true)) {
+      if (completedKind === "hold_cycle" && (!response.result || response.result.verified !== true)) {
+        outcome = "Hold cycle was not confirmed by earbuds"
+      } else if (completedKind === "touch_write" && (!response.result || response.result.verified !== true)) {
         outcome = "Touch assignment was not confirmed by earbuds"
       } else if (response.result && response.result.verified === true) {
         outcome = "Verified on earbuds"
@@ -799,9 +844,104 @@ BarWidget {
               }
             }
 
+            Column {
+              objectName: "customEqSection"
+              x: Style.space(8)
+              width: parent.width - x
+              spacing: Style.space(5)
+              visible: root.customEqEntries.length > 0
+
+              Button {
+                objectName: "customEqDisclosure"
+                width: parent.width
+                visible: root.customEqEntries.length > 0
+                text: (root.customEqExpanded ? "▾  " : "▸  ") + "Custom EQ"
+                leftAlign: true
+                bordered: true
+                foreground: root.bar.foreground
+                background: root.bar.background
+                accent: Color.accent
+                fontFamily: root.bar.fontFamily
+                focusable: true
+                onActiveFocusChanged: if (activeFocus) panelScroll.reveal(this)
+                onClicked: root.customEqExpanded = !root.customEqExpanded
+              }
+
+              Controls.ComboBox {
+                width: parent.width
+                visible: root.customEqExpanded && root.customEqEntries.length > 0
+                model: root.customEqEntries.map(function(entry) { return entry.name })
+                currentIndex: root.customSlotIndex
+                enabled: root.customEqExpanded && root.pendingRequestId < 0
+                onActivated: function(index) { root.selectCustomSlot(index) }
+              }
+
+              Flow {
+                id: customBandFlow
+                objectName: "customEqBands"
+                width: parent.width
+                visible: root.customEqExpanded && root.customEqEntries.length > 0
+                enabled: root.customEqExpanded
+                spacing: Style.space(5)
+
+                Repeater {
+                  id: bandRepeater
+                  model: root.selectedCustom ? root.selectedCustom.bands : []
+                  delegate: Column {
+                    required property var modelData
+                    property alias gainValue: gainBox.value
+                    width: (customBandFlow.width - customBandFlow.spacing) / 2
+                    spacing: Style.space(2)
+
+                    Text {
+                      width: parent.width
+                      text: modelData.frequency_hz >= 1000
+                        ? (modelData.frequency_hz / 1000) + " kHz" : modelData.frequency_hz + " Hz"
+                      color: root.bar.foreground
+                      font.family: root.bar.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+                    Controls.SpinBox {
+                      id: gainBox
+                      objectName: "customEqGain_" + modelData.frequency_hz
+                      width: parent.width
+                      from: root.selectedCustom ? root.selectedCustom.min_gain_db : -6
+                      to: root.selectedCustom ? root.selectedCustom.max_gain_db : 6
+                      stepSize: root.eqStatus && root.eqStatus.gain_step_db
+                        ? root.eqStatus.gain_step_db : 1
+                      value: modelData.gain_db
+                      editable: true
+                      enabled: root.snapshot && root.snapshot.custom_eq_write_verified === true
+                        && root.pendingRequestId < 0
+                      textFromValue: function(value) { return (value > 0 ? "+" : "") + value + " dB" }
+                      valueFromText: function(text) { return parseInt(text) || 0 }
+                    }
+                  }
+                }
+              }
+
+              Button {
+                width: parent.width
+                height: Math.max(implicitHeight, Style.space(32))
+                visible: root.customEqExpanded && root.selectedCustom !== null
+                text: "Apply " + (root.selectedCustom ? root.selectedCustom.name : "custom EQ")
+                bordered: true
+                leftAlign: true
+                enabled: root.customEqExpanded && root.snapshot && root.snapshot.custom_eq_write_verified === true
+                  && root.pendingRequestId < 0
+                opacity: enabled ? 1.0 : 0.5
+                foreground: root.bar.foreground
+                background: root.bar.background
+                accent: Color.accent
+                fontFamily: root.bar.fontFamily
+                onClicked: root.applyCustomEq()
+              }
+            }
+
             // Local fork: the phone app's BassWave control (feature switch
             // 0x1d plus the -10..+10 level).
             Column {
+              objectName: "bassWaveSection"
               width: parent.width
               visible: root.bassEngineAvailable
               spacing: Style.space(4)
@@ -853,91 +993,6 @@ BarWidget {
               }
             }
 
-            Button {
-              objectName: "customEqDisclosure"
-              width: parent.width
-              visible: root.customEqEntries.length > 0
-              text: (root.customEqExpanded ? "▾  " : "▸  ") + "Custom EQ"
-              leftAlign: true
-              bordered: true
-              foreground: root.bar.foreground
-              background: root.bar.background
-              accent: Color.accent
-              fontFamily: root.bar.fontFamily
-              focusable: true
-              onActiveFocusChanged: if (activeFocus) panelScroll.reveal(this)
-              onClicked: root.customEqExpanded = !root.customEqExpanded
-            }
-
-            Controls.ComboBox {
-              width: parent.width
-              visible: root.customEqExpanded && root.customEqEntries.length > 0
-              model: root.customEqEntries.map(function(entry) { return entry.name })
-              currentIndex: root.customSlotIndex
-              enabled: root.customEqExpanded && root.pendingRequestId < 0
-              onActivated: function(index) { root.selectCustomSlot(index) }
-            }
-
-            Flow {
-              id: customBandFlow
-              objectName: "customEqBands"
-              width: parent.width
-              visible: root.customEqExpanded && root.customEqEntries.length > 0
-              enabled: root.customEqExpanded
-              spacing: Style.space(5)
-
-              Repeater {
-                id: bandRepeater
-                model: root.selectedCustom ? root.selectedCustom.bands : []
-                delegate: Column {
-                  required property var modelData
-                  property alias gainValue: gainBox.value
-                  width: (customBandFlow.width - customBandFlow.spacing) / 2
-                  spacing: Style.space(2)
-
-                  Text {
-                    width: parent.width
-                    text: modelData.frequency_hz >= 1000
-                      ? (modelData.frequency_hz / 1000) + " kHz" : modelData.frequency_hz + " Hz"
-                    color: root.bar.foreground
-                    font.family: root.bar.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                  }
-                  Controls.SpinBox {
-                    id: gainBox
-                    objectName: "customEqGain_" + modelData.frequency_hz
-                    width: parent.width
-                    from: root.selectedCustom ? root.selectedCustom.min_gain_db : -6
-                    to: root.selectedCustom ? root.selectedCustom.max_gain_db : 6
-                    stepSize: root.eqStatus && root.eqStatus.gain_step_db
-                      ? root.eqStatus.gain_step_db : 1
-                    value: modelData.gain_db
-                    editable: true
-                    enabled: root.snapshot && root.snapshot.custom_eq_write_verified === true
-                      && root.pendingRequestId < 0
-                    textFromValue: function(value) { return (value > 0 ? "+" : "") + value + " dB" }
-                    valueFromText: function(text) { return parseInt(text) || 0 }
-                  }
-                }
-              }
-            }
-
-            Button {
-              width: parent.width
-              height: Math.max(implicitHeight, Style.space(32))
-              visible: root.customEqExpanded && root.selectedCustom !== null
-              text: "Apply " + (root.selectedCustom ? root.selectedCustom.name : "custom EQ")
-              bordered: true
-              leftAlign: true
-              enabled: root.customEqExpanded && root.snapshot && root.snapshot.custom_eq_write_verified === true
-                && root.pendingRequestId < 0
-              opacity: enabled ? 1.0 : 0.5
-              foreground: root.bar.foreground
-              background: root.bar.background
-              accent: Color.accent
-              fontFamily: root.bar.fontFamily
-              onClicked: root.applyCustomEq()
-            }
           }
 
           // Local fork: the phone app's feature switches and the
@@ -1073,6 +1128,89 @@ BarWidget {
             wrapMode: Text.Wrap
           }
 
+          Column {
+            objectName: "holdCycleEditor"
+            width: parent.width
+            spacing: Style.space(5)
+            visible: root.touchControlsExpanded && root.holdCycleAvailable
+            enabled: root.touchControlsExpanded
+
+            Text {
+              width: parent.width
+              text: "Touch & hold · both earbuds"
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+            Text {
+              width: parent.width
+              visible: !root.holdCycle
+              text: "Use Refresh to read the hold modes."
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.Wrap
+            }
+            Flow {
+              width: parent.width
+              spacing: Style.space(8)
+              Repeater {
+                model: root.holdCycle ? root.holdCycle.options : []
+                delegate: Controls.CheckBox {
+                  required property var modelData
+                  objectName: "holdCycleOption_" + modelData.value
+                  text: modelData.label
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  palette.windowText: root.bar.foreground
+                  checked: root.holdCycleDraft.indexOf(modelData.value) >= 0
+                  enabled: root.holdCycleEditable
+                  onClicked: root.toggleHoldCycleMode(modelData.value)
+                  onActiveFocusChanged: if (activeFocus) panelScroll.reveal(this)
+                }
+              }
+            }
+            Text {
+              width: parent.width
+              visible: !!root.holdCycle
+              text: "Choose at least two modes to cycle through."
+              opacity: root.holdCycleDraftValid ? 0.6 : 1.0
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.Wrap
+            }
+            Row {
+              spacing: Style.space(8)
+              visible: !!root.holdCycle
+              Button {
+                objectName: "applyHoldCycle"
+                width: Style.space(100)
+                text: "Apply"
+                bordered: true
+                foreground: root.bar.foreground
+                background: root.bar.background
+                accent: Color.accent
+                fontFamily: root.bar.fontFamily
+                enabled: root.holdCycleEditable && root.holdCycleDirty && root.holdCycleDraftValid
+                onClicked: root.applyHoldCycle()
+              }
+              Button {
+                objectName: "cancelHoldCycle"
+                width: Style.space(100)
+                text: "Cancel"
+                bordered: true
+                foreground: root.bar.foreground
+                background: root.bar.background
+                accent: Color.accent
+                fontFamily: root.bar.fontFamily
+                enabled: root.holdCycleEditable && root.holdCycleDirty
+                onClicked: root.resetHoldCycleDraft()
+              }
+            }
+          }
+
           Flow {
             id: touchColumns
             width: parent.width
@@ -1100,6 +1238,7 @@ BarWidget {
                 Repeater {
                   model: root.touchControls.filter(function(entry) {
                     return entry.side === touchSide.modelData && entry.button === 1
+                      && !(root.holdCycleAvailable && entry.action === 4)
                   })
                   delegate: Column {
                     id: touchRow
@@ -1413,6 +1552,7 @@ BarWidget {
         bass_level: root.snapshot ? root.snapshot.bass_level : null,
         feature_switches: root.snapshot ? root.snapshot.feature_switches : null,
         touch_controls: root.touchControls,
+        hold_cycle: root.holdCycle,
         anc_labels: root.snapshot ? root.snapshot.anc_labels : null,
         capabilities: root.snapshot ? root.snapshot.capabilities : null,
         compatibility: root.compatibilityKind,
