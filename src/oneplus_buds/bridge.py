@@ -37,6 +37,7 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         ),
         "capabilities": sorted(capabilities),
         "anc_modes": sorted(profile.anc.write_indices) if profile and profile.verified else [],
+        "anc_labels": dict(profile.anc.level_labels) if profile else {},
         "eq": snapshot.eq_status.to_dict() if snapshot.eq_status else None,
         "eq_write_verified": bool(
             profile and profile.verified and profile.eq and profile.eq.write_verified
@@ -51,6 +52,7 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         "ignored_frames": snapshot.ignored_frames,
         "reconnect_count": snapshot.reconnect_count,
         "generation": snapshot.generation,
+        "bass_level": snapshot.bass_level,
     }
 
 
@@ -209,6 +211,19 @@ class BudsFrontendBridge:
                         "find_earbuds parameter 'ringing' must be a boolean"
                     )
                 result = self.controller.find_earbuds(ringing)
+            elif command == "set_bass_level":
+                # Local fork: set the bass engine level ("BassWave").
+                self._require_parameters(command, params, {"level"})
+                level = params["level"]
+                if not isinstance(level, int) or isinstance(level, bool):
+                    raise ValueError(
+                        "set_bass_level parameter 'level' must be an integer"
+                    )
+                result = self.controller.set_bass_level(level)
+            elif command == "bass_status":
+                # Local fork: read the bass engine range and level.
+                self._require_parameters(command, params, set())
+                result = self.controller.bass_engine_status()
             else:
                 return self._response(
                     command,

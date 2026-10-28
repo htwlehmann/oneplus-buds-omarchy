@@ -41,6 +41,17 @@ BarWidget {
     ? customEqEntries[Math.max(0, Math.min(customSlotIndex, customEqEntries.length - 1))] : null
   readonly property bool eqAvailable: !!(snapshot && snapshot.capabilities
     && snapshot.capabilities.indexOf("eq") !== -1)
+  // Local fork: the phone app's feature switches and the bass engine level.
+  readonly property var featureSwitches: (snapshot && snapshot.feature_switches)
+    ? snapshot.feature_switches : {}
+  readonly property bool featureSwitchesAvailable: !!(snapshot && snapshot.capabilities
+    && snapshot.capabilities.indexOf("feature_switches") !== -1)
+  readonly property bool bassEngineAvailable: !!(snapshot && snapshot.capabilities
+    && snapshot.capabilities.indexOf("bass_engine") !== -1)
+  readonly property int bassLevel: (snapshot && snapshot.bass_level !== null
+    && snapshot.bass_level !== undefined) ? Number(snapshot.bass_level) : 0
+  readonly property bool bassEngineEnabled: featureSwitches.bass_engine === true
+  readonly property var featureList: BarModel.featureList(snapshot)
   readonly property bool useTwoColumnLayout: eqAvailable
     && popup.availableCardWidth >= Style.space(560)
   readonly property int panelHeight: popup.contentHeight
@@ -115,6 +126,27 @@ BarWidget {
           pendingKind = "eq_status"
         }
       }
+      // Local fork: load the feature switches and the bass engine level that
+      // the phone app shows, so the panel starts with the real state.
+      if (budsService && connection === "connected" && pendingRequestId < 0) {
+        if (snapshot && snapshot.capabilities
+            && snapshot.capabilities.indexOf("feature_switches") !== -1) {
+          var switchesRequest = budsService.request("feature_switches", {})
+          if (switchesRequest !== null) {
+            pendingRequestId = switchesRequest
+            pendingKind = "feature_switches"
+          }
+        }
+        if (snapshot && snapshot.capabilities
+            && snapshot.capabilities.indexOf("bass_engine") !== -1
+            && pendingRequestId < 0) {
+          var bassRequest = budsService.request("bass_status", {})
+          if (bassRequest !== null) {
+            pendingRequestId = bassRequest
+            pendingKind = "bass_status"
+          }
+        }
+      }
     } else if (!hitArea.containsMouse) {
       collapseTimer.restart()
     }
@@ -147,6 +179,37 @@ BarWidget {
     pendingRequestId = requestId
     pendingKind = "eq"
     pendingMode = String(value)
+    outcome = ""
+  }
+
+  // Local fork: the phone app's feature switches and bass engine.
+  function toggleFeature(name, enabled) {
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    var requestId = budsService.setFeatureSwitch(name, enabled === true)
+    if (requestId === null) { outcome = "Could not start request"; return }
+    pendingRequestId = requestId
+    pendingKind = "feature"
+    pendingMode = String(name)
+    outcome = ""
+  }
+
+  function setBassLevel(level) {
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    var requestId = budsService.setBassLevel(Number(level))
+    if (requestId === null) { outcome = "Could not start request"; return }
+    pendingRequestId = requestId
+    pendingKind = "bass"
+    pendingMode = String(level)
+    outcome = ""
+  }
+
+  function findEarbuds() {
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    var requestId = budsService.findEarbuds(true)
+    if (requestId === null) { outcome = "Could not start request"; return }
+    pendingRequestId = requestId
+    pendingKind = "find"
+    pendingMode = "find"
     outcome = ""
   }
 
@@ -279,6 +342,12 @@ BarWidget {
       outcome = "Verified on earbuds"
     } else if (response.ok === true && completedKind === "eq_status") {
       outcome = ""
+    } else if (response.ok === true && completedKind === "bass") {
+      outcome = "Bass level sent"
+    } else if (response.ok === true && completedKind === "find") {
+      outcome = "Earbuds are ringing"
+    } else if (response.ok === true && completedKind === "feature") {
+      outcome = "Switch updated"
     } else {
       var detail = response.error && response.error.message
         ? String(response.error.message) : "Change could not be verified"
@@ -410,8 +479,12 @@ BarWidget {
           height: implicitHeight
           implicitHeight: root.useTwoColumnLayout
             ? Math.max(noiseColumn.implicitHeight, eqColumn.implicitHeight)
+              + (featuresColumn.visible
+                ? Style.space(14) + featuresColumn.implicitHeight : 0)
             : noiseColumn.implicitHeight
               + (eqColumn.visible ? Style.space(14) + eqColumn.implicitHeight : 0)
+              + (featuresColumn.visible
+                ? Style.space(14) + featuresColumn.implicitHeight : 0)
 
           Column {
             id: noiseColumn
@@ -527,6 +600,59 @@ BarWidget {
               }
             }
 
+            // Local fork: the phone app's BassWave control (feature switch
+            // 0x1d plus the -10..+10 level).
+            Column {
+              width: parent.width
+              visible: root.bassEngineAvailable
+              spacing: Style.space(4)
+              topPadding: Style.space(6)
+
+              Row {
+                width: parent.width
+                spacing: Style.space(8)
+
+                Text {
+                  width: parent.width - Style.space(44)
+                  text: "BassWave"
+                  textFormat: Text.PlainText
+                  color: root.bar.foreground
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: true
+                }
+
+                ToggleSwitch {
+                  checked: root.bassEngineEnabled
+                  busy: root.pendingRequestId >= 0
+                  enabled: root.connection === "connected" && root.pendingRequestId < 0
+                  onToggled: root.toggleFeature("bass_engine", !root.bassEngineEnabled)
+                }
+              }
+
+              Text {
+                width: parent.width
+                text: "Bass level " + (root.bassLevel > 0 ? "+" : "") + root.bassLevel
+                textFormat: Text.PlainText
+                color: root.bar.foreground
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              PanelSlider {
+                id: bassSlider
+                width: parent.width
+                bar: root.bar
+                minimum: -10
+                maximum: 10
+                step: 1
+                integer: true
+                value: root.bassLevel
+                enabled: root.connection === "connected" && root.pendingRequestId < 0
+                onReleased: function(value) { root.setBassLevel(Math.round(value)) }
+              }
+            }
+
             Text {
               width: parent.width
               visible: root.customEqEntries.length > 0
@@ -603,6 +729,79 @@ BarWidget {
               accent: Color.accent
               fontFamily: root.bar.fontFamily
               onClicked: root.applyCustomEq()
+            }
+          }
+
+          // Local fork: the phone app's feature switches and the
+          // find-my-earbuds tone.
+          Column {
+            id: featuresColumn
+            x: 0
+            y: root.useTwoColumnLayout
+              ? Math.max(noiseColumn.implicitHeight, eqColumn.implicitHeight)
+                + Style.space(14)
+              : noiseColumn.implicitHeight
+                + (eqColumn.visible ? Style.space(14) + eqColumn.implicitHeight : 0)
+                + Style.space(14)
+            width: parent.width
+            spacing: Style.space(5)
+            visible: root.featureSwitchesAvailable
+              || (snapshot && snapshot.capabilities
+                && snapshot.capabilities.indexOf("find_earbuds") !== -1)
+
+            Text {
+              width: parent.width
+              text: "Features"
+              textFormat: Text.PlainText
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+              visible: root.featureList.length > 0
+            }
+
+            Repeater {
+              model: root.featureList
+
+              delegate: Row {
+                required property var modelData
+                width: featuresColumn.width
+                spacing: Style.space(8)
+
+                Text {
+                  width: parent.width - Style.space(44)
+                  text: modelData.label
+                  textFormat: Text.PlainText
+                  color: root.bar.foreground
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  elide: Text.ElideRight
+                }
+
+                ToggleSwitch {
+                  checked: modelData.enabled
+                  busy: root.pendingRequestId >= 0
+                  enabled: root.connection === "connected" && root.pendingRequestId < 0
+                  onToggled: root.toggleFeature(modelData.name, !modelData.enabled)
+                }
+              }
+            }
+
+            Button {
+              width: parent.width
+              height: Math.max(implicitHeight, Style.space(32))
+              visible: snapshot && snapshot.capabilities
+                && snapshot.capabilities.indexOf("find_earbuds") !== -1
+              text: "Find my earbuds"
+              bordered: true
+              leftAlign: true
+              enabled: root.connection === "connected" && root.pendingRequestId < 0
+              opacity: enabled ? 1.0 : 0.5
+              foreground: root.bar.foreground
+              background: root.bar.background
+              accent: Color.accent
+              fontFamily: root.bar.fontFamily
+              onClicked: root.findEarbuds()
             }
           }
         }
@@ -839,6 +1038,10 @@ BarWidget {
         current_anc: root.currentAncMode,
         pending: root.pendingRequestId >= 0,
         eq: root.eqStatus,
+        bass_level: root.snapshot ? root.snapshot.bass_level : null,
+        feature_switches: root.snapshot ? root.snapshot.feature_switches : null,
+        anc_labels: root.snapshot ? root.snapshot.anc_labels : null,
+        capabilities: root.snapshot ? root.snapshot.capabilities : null,
         compatibility: root.compatibilityKind,
         compatibility_notice: root.compatibilityNoticeShown,
         report_available: root.reportAvailable,

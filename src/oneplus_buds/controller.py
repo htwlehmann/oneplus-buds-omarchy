@@ -33,6 +33,7 @@ class BudsController:
         self._reconnect_count = 0
         self._generation = 0
         self._eq_status: EqStatusResult | None = None
+        self._bass_level: int | None = None
 
     def start(self) -> ControllerSnapshot:
         with self._lock:
@@ -293,6 +294,28 @@ class BudsController:
             self._generation += 1
             return {"ringing": ringing, "sent": sent, "set_status": status}
 
+    def set_bass_level(self, level: int) -> dict[str, object]:
+        """Set the bass engine level ("BassWave"), -10 to +10."""
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            status, sent = cast(OpoSession, self._session).set_bass_level(level)
+            self._bass_level = level
+            self._generation += 1
+            return {"level": level, "sent": sent, "set_status": status}
+
+    def bass_engine_status(self) -> dict[str, object]:
+        """Read the bass engine range and the current level."""
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            minimum, maximum, current = cast(OpoSession, self._session).bass_engine_status()
+            self._bass_level = current
+            self._generation += 1
+            return {"min": minimum, "max": maximum, "level": current}
+
     def snapshot(self) -> ControllerSnapshot:
         with self._lock:
             return ControllerSnapshot(
@@ -305,6 +328,7 @@ class BudsController:
                 reconnect_count=self._reconnect_count,
                 generation=self._generation,
                 eq_status=self._eq_status,
+                bass_level=self._bass_level,
             )
 
     def _connect_session(self) -> None:
@@ -348,6 +372,10 @@ class BudsController:
                 self._feature_switches.update(
                     {key: value for key, value in event.data.items() if isinstance(value, bool)}
                 )
+            elif event.kind == "bass_level":
+                level = event.data.get("level")
+                if isinstance(level, int):
+                    self._bass_level = level
             elif event.kind == "notification":
                 code = event.data.get("event_code")
                 if isinstance(code, int):

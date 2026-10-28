@@ -16,16 +16,20 @@ QUERY_ANC = 0x010C
 QUERY_STATUS = 0x010D
 QUERY_EQ = 0x010F
 QUERY_EQ_ALL = 0x0122
+QUERY_BASS_ENGINE = 0x0124
 SET_ANC = 0x0404
 SET_EQ = 0x0406
 SET_EQ_DETAIL = 0x0418
 SET_FIND_MODE = 0x0400
 SET_FEATURE_SWITCH = 0x0403
+SET_BASS_ENGINE = 0x041B
 RESPONSE_SET_ANC = 0x8404
 RESPONSE_SET_EQ = 0x8406
 RESPONSE_SET_EQ_DETAIL = 0x8418
 RESPONSE_SET_FEATURE_SWITCH = 0x8403
 RESPONSE_SET_FIND_MODE = 0x8400
+RESPONSE_SET_BASS_ENGINE = 0x841B
+RESPONSE_BASS_ENGINE = 0x8124
 
 RESPONSE_PRODUCT_ID = 0x8103
 RESPONSE_REMOTE_VERSION = 0x8105
@@ -36,6 +40,8 @@ RESPONSE_EQ = 0x810F
 RESPONSE_EQ_ALL = 0x8122
 NOTIFY_STATE = 0x0204
 NOTIFY_EQ = 0x0504
+NOTIFY_FEATURE_SWITCHES = 0x0503
+NOTIFY_BASS_ENGINE = 0x0508
 RESPONSE_BROADCAST_CODES = 0x8200
 
 FEATURE_SWITCH_NAMES = {
@@ -59,6 +65,14 @@ FEATURE_SWITCH_NAMES = {
 # and pads the rest with zeros.
 FEATURE_SWITCH_QUERY_PREFIX = bytes((1,))
 FEATURE_SWITCH_WRITE = bytes((1,))
+
+# The bass engine level ("BassWave") travels as [min, max, value]. The phone
+# app sends the allowed range together with the wanted value, and the device
+# echoes the same three bytes back as a notification.
+BASS_LEVEL_MIN = -10
+BASS_LEVEL_MAX = 10
+BASS_LEVEL_RANGE = bytes((BASS_LEVEL_MIN & 0xFF, BASS_LEVEL_MAX & 0xFF))
+BASS_LEVEL_NOTICE = bytes((0xF6, 0x0A))
 
 # Authentication frames have a legacy envelope that is not representable by
 # encode_frame: HELLO carries a trailing 0x12 beyond its zero inner length.

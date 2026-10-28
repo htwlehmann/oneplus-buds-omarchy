@@ -137,3 +137,4 @@ class ControllerSnapshot:
     reconnect_count: int
     generation: int
     eq_status: EqStatusResult | None = None
+    bass_level: int | None = None

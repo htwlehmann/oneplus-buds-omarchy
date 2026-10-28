@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -13,6 +13,10 @@ class AncProfile:
     read_modes: dict[int, str]
     read_levels: dict[int, str]
     sequences: dict[str, int]
+    # Optional display labels per level. The phone app names the intensity
+    # levels differently per model, for example "Hoch", "Mittel" and "Niedrig"
+    # on the Nord Buds 3 Pro, so the labels belong to the device profile.
+    level_labels: dict[str, str] = field(default_factory=dict)
 
     def payload_for(self, mode: str) -> bytes:
         try:
@@ -63,18 +67,16 @@ PRO_2_EQ_PRESETS = (
     EqPresetProfile(7, "hans-zimmer-soundscape-tuning", "Hans Zimmer Soundscape Tuning"),
 )
 
-# The Nord Buds 3 Pro answers the native EQ selection with seven factory IDs
-# (0..6). The device returns an empty catalogue for 0x0122, so it publishes no
-# names of its own; the display names below are the owner's app labels and stay
-# generic until the phone app names are confirmed for this firmware.
+# The Nord Buds 3 Pro answers the native EQ selection with factory IDs.
+# The phone app ("Wireless Earphones", ColorOS) exposes exactly three of
+# them; the owner confirmed the mapping by changing every preset in the app
+# and reading the device back:
+#   id 3 = Ausgewogen (Standard), id 4 = Serenade, id 5 = Bass
+# The device accepts the other IDs as well but the app does not offer them.
 NORD_BUDS_3_PRO_EQ_PRESETS = (
-    EqPresetProfile(0, "preset-1", "Preset 1"),
-    EqPresetProfile(1, "preset-2", "Preset 2"),
-    EqPresetProfile(2, "preset-3", "Preset 3"),
-    EqPresetProfile(3, "preset-4", "Preset 4"),
-    EqPresetProfile(4, "preset-5", "Preset 5"),
-    EqPresetProfile(5, "preset-6", "Preset 6"),
-    EqPresetProfile(6, "preset-7", "Preset 7"),
+    EqPresetProfile(3, "balanced", "Ausgewogen (Standard)", ("ausgewogen", "balanced")),
+    EqPresetProfile(4, "serenade", "Serenade", ("serenad",)),
+    EqPresetProfile(5, "bass", "Bass", ("bass-boost",)),
 )
 
 
@@ -168,10 +170,19 @@ PROFILES = {
                 "deep": 4,
                 "medium": 5,
                 "light": 6,
+                "auto": 7,
             },
-            read_modes={0: "off", 1: "on", 2: "transparency"},
-            read_levels={4: "deep", 5: "medium", 6: "light"},
+            read_modes={0: "off", 1: "on", 2: "transparency", 3: "off", 8: "transparency"},
+            read_levels={4: "deep", 5: "medium", 6: "light", 7: "auto"},
             sequences={"off": 0x40},
+            # The phone app labels the four intensities "Auto", "High",
+            # "Moderate" and "Low" (German: Auto, Hoch, Mittel, Niedrig).
+            level_labels={
+                "deep": "High",
+                "medium": "Moderate",
+                "light": "Low",
+                "auto": "Auto",
+            },
         ),
         eq=EqProfile(NORD_BUDS_3_PRO_EQ_PRESETS, supports_custom=False, write_verified=True,
                      custom_write_verified=False),
@@ -184,6 +195,9 @@ PROFILES = {
                 "transparency",
                 "anc_levels",
                 "eq",
+                "bass_engine",
+                "feature_switches",
+                "find_earbuds",
             }
         ),
         # Owner-verified on real hardware: see

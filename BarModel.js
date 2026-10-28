@@ -46,6 +46,13 @@ function ancModes(snapshot) {
     deep: "Deep",
     smart: "Smart"
   }
+  // Local fork: the device profile may rename the levels the way the phone
+  // app does ("Hoch", "Mittel", "Niedrig" on the Nord Buds 3 Pro).
+  var profileLabels = snapshot && snapshot.anc_labels ? snapshot.anc_labels : {}
+  for (var key in profileLabels) {
+    if (Object.prototype.hasOwnProperty.call(profileLabels, key))
+      labels[key] = String(profileLabels[key])
+  }
   var preferred = ["off", "transparency", "on", "light", "medium", "deep", "smart"]
   var seen = {}
   var options = []
@@ -94,6 +101,55 @@ function currentAncMode(snapshot) {
 function eqPresets(snapshot) {
   var eq = snapshot && snapshot.eq
   return eq && Array.isArray(eq.presets) ? eq.presets : []
+}
+
+// Local fork: the phone app's feature switches, in the order the app lists
+// them. Only switches the device actually reported are offered.
+var FEATURE_LABELS = {
+  personal_noise: "Personalised noise cancellation",
+  bass_engine: "BassWave",
+  low_latency: "Low latency game mode",
+  wear_detection: "Wear detection",
+  click_to_take_photo: "Tap to take photo",
+  multipoint: "Dual connection",
+  high_quality_audio: "High quality audio",
+  spatial_sound: "Spatial audio",
+  vocal_enhance: "Vocal enhancement",
+  hearing_enhancement: "Hearing enhancement",
+  game_equalizer: "Game equalizer",
+  collect_logs: "Diagnostic logs",
+  zen_mode: "Zen mode",
+  game_mode_main: "Game mode"
+}
+
+var FEATURE_ORDER = [
+  "personal_noise",
+  "bass_engine",
+  "low_latency",
+  "wear_detection",
+  "click_to_take_photo",
+  "multipoint",
+  "high_quality_audio",
+  "spatial_sound",
+  "vocal_enhance",
+  "hearing_enhancement",
+  "game_equalizer",
+  "zen_mode",
+  "game_mode_main",
+  "collect_logs"
+]
+
+function featureList(snapshot) {
+  var switches = snapshot && snapshot.feature_switches
+  if (!switches || typeof switches !== "object") return []
+  var result = []
+  for (var i = 0; i < FEATURE_ORDER.length; i++) {
+    var name = FEATURE_ORDER[i]
+    if (typeof switches[name] === "boolean")
+      result.push({ name: name, label: FEATURE_LABELS[name] || titleCase(name),
+        enabled: switches[name] })
+  }
+  return result
 }
 
 function customEqEntries(snapshot) {
@@ -210,6 +266,7 @@ if (typeof module !== "undefined") {
     currentAncMode: currentAncMode,
     eqPresets: eqPresets,
     customEqEntries: customEqEntries,
+    featureList: featureList,
     compatibility: compatibility,
     compatibilityLabel: compatibilityLabel,
     reportActionLabel: reportActionLabel,

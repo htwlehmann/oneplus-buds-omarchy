@@ -28,11 +28,11 @@ class NordBuds3ProProfileTests(unittest.TestCase):
     def test_anc_write_indices_match_the_measured_bitmap(self) -> None:
         self.assertEqual(
             self.profile.anc.write_indices,
-            {"off": 0, "on": 1, "transparency": 2, "deep": 4, "medium": 5, "light": 6},
+            {"off": 0, "on": 1, "transparency": 2, "deep": 4, "medium": 5,
+             "light": 6, "auto": 7},
         )
-        # Byte 0x80 (index 7, "smart" on the Buds Pro 2) was acknowledged but
-        # never applied by this device, so it must stay unsupported.
-        self.assertNotIn("smart", self.profile.anc.write_indices)
+        # The phone app's device table lists Auto at index 7 for this model.
+        self.assertEqual(self.profile.anc.payload_for("auto"), b"\x01\x01\x80")
 
     def test_anc_payload_bytes_match_the_measured_frames(self) -> None:
         expected = {
@@ -54,11 +54,28 @@ class NordBuds3ProProfileTests(unittest.TestCase):
         self.assertEqual(self.profile.anc.read_levels[5], "medium")
         self.assertEqual(self.profile.anc.read_levels[6], "light")
 
-    def test_native_eq_exposes_seven_factory_presets_without_custom_bands(self) -> None:
+    def test_anc_levels_use_the_phone_app_names(self) -> None:
+        # The owner changed every level in the phone app and read the device
+        # back: 0x10 is "Hoch", 0x20 is "Mittel" and 0x40 is "Niedrig".
+        from oneplus_buds.protocol import BASS_LEVEL_MAX, BASS_LEVEL_MIN
+        self.assertEqual(BASS_LEVEL_MIN, -10)
+        self.assertEqual(BASS_LEVEL_MAX, 10)
+        self.assertEqual(self.profile.anc.payload_for("deep"), b"\x01\x01\x10")
+        self.assertEqual(self.profile.anc.payload_for("medium"), b"\x01\x01\x20")
+        self.assertEqual(self.profile.anc.payload_for("light"), b"\x01\x01\x40")
+
+    def test_native_eq_exposes_the_three_app_presets_without_custom_bands(self) -> None:
         eq = self.profile.eq
         self.assertIsNotNone(eq)
         assert eq is not None
-        self.assertEqual([preset.eq_id for preset in eq.presets], [0, 1, 2, 3, 4, 5, 6])
+        # The phone app offers exactly three factory presets; the owner
+        # confirmed id 3 = Ausgewogen, 4 = Serenade and 5 = Bass by changing
+        # every preset in the app and reading the device back.
+        self.assertEqual([preset.eq_id for preset in eq.presets], [3, 4, 5])
+        self.assertEqual(
+            [preset.name for preset in eq.presets],
+            ["Ausgewogen (Standard)", "Serenade", "Bass"],
+        )
         self.assertTrue(eq.write_verified)
         self.assertFalse(eq.supports_custom)
         self.assertFalse(eq.custom_write_verified)
@@ -74,6 +91,9 @@ class NordBuds3ProProfileTests(unittest.TestCase):
                 "transparency",
                 "anc_levels",
                 "eq",
+                "bass_engine",
+                "feature_switches",
+                "find_earbuds",
             }),
         )
 

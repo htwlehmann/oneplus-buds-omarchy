@@ -114,6 +114,22 @@ Item {
     return request("save_diagnostic_report", { path: String(path || "") })
   }
 
+  // Local fork: the phone app's extra controls.
+  function setFeatureSwitch(feature, enabled) {
+    return request("set_feature_switch", {
+      feature: String(feature || ""),
+      enabled: enabled === true
+    })
+  }
+
+  function setBassLevel(level) {
+    return request("set_bass_level", { level: Number(level) })
+  }
+
+  function findEarbuds(ringing) {
+    return request("find_earbuds", { ringing: ringing !== false })
+  }
+
   onHelperPathChanged: startHelper()
 
   Component.onCompleted: startHelper()

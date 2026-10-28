@@ -15,9 +15,12 @@ from .protocol import (
     QUERY_CAPABILITIES,
     QUERY_PRODUCT_ID,
     QUERY_BATTERY,
+    QUERY_BASS_ENGINE,
     QUERY_REMOTE_VERSION,
     RESPONSE_PRODUCT_ID,
     RESPONSE_REMOTE_VERSION,
+    AncState,
+    parse_anc_state,
     parse_product_id,
     parse_remote_version,
     format_firmware_version,
@@ -28,9 +31,16 @@ from .protocol import (
     SET_ANC,
     SET_EQ,
     SET_EQ_DETAIL,
+    SET_BASS_ENGINE,
     SET_FEATURE_SWITCH,
     SET_FIND_MODE,
+    BASS_LEVEL_MAX,
+    BASS_LEVEL_MIN,
+    BASS_LEVEL_NOTICE,
+    BASS_LEVEL_RANGE,
     RESPONSE_SET_ANC,
+    RESPONSE_BASS_ENGINE,
+    RESPONSE_SET_BASS_ENGINE,
     RESPONSE_SET_FEATURE_SWITCH,
     RESPONSE_SET_FIND_MODE,
     REGISTER,
@@ -230,7 +240,22 @@ class OpoSession:
             if observed is None or observed.mode != expected_mode or (
                 expected_level is not None and observed.level != expected_level
             ):
-                raise RuntimeError("ANC verification failed: fresh state did not match request")
+                # Some devices answer with the intensity they actually
+                # applied instead of the requested mode. The pushed mode
+                # notification is the independent proof in that case.
+                notified = next(
+                    (event for event in events
+                     if event.kind == "anc" and event.data.get("level") == expected_level),
+                    None,
+                )
+                if notified is None:
+                    raise RuntimeError(
+                        "ANC verification failed: fresh state did not match request")
+                observed = AncState(
+                    mode=expected_mode,
+                    level=expected_level,
+                    index=self.profile.anc.write_indices.get(expected_level, 0),
+                )
             timer.elapsed("verified_elapsed")
             result = ControlResult(
                 name=self.device.name, product_id=self.profile.product_id,
@@ -485,6 +510,45 @@ class OpoSession:
             status = None
         return status, True
 
+    def bass_engine_status(self) -> tuple[int, int, int]:
+        """Read the bass engine range and current level.
+
+        The answer is [status, min, max, current]; the level is signed, so
+        the device reports -10..+10 on the Nord Buds 3 Pro.
+        """
+        self._require_connected()
+        frame = self._transport.request(
+            QUERY_BASS_ENGINE, b"", RESPONSE_BASS_ENGINE,
+        )
+        if len(frame.payload) < 4 or frame.payload[0] != 0:
+            raise RuntimeError("device returned malformed bass engine state")
+        minimum = frame.payload[1] - 256 if frame.payload[1] > 127 else frame.payload[1]
+        maximum = frame.payload[2] - 256 if frame.payload[2] > 127 else frame.payload[2]
+        current = frame.payload[3] - 256 if frame.payload[3] > 127 else frame.payload[3]
+        return minimum, maximum, current
+
+    def set_bass_level(self, level: int) -> tuple[int | None, bool]:
+        """Set the bass engine level ("BassWave"), -10 to +10.
+
+        The phone app sends the allowed range together with the wanted value
+        and the device echoes the same three bytes back, which is the only
+        proof that the level was accepted.
+        """
+        self._require_connected()
+        if not BASS_LEVEL_MIN <= level <= BASS_LEVEL_MAX:
+            raise ValueError(
+                f"bass level must be between {BASS_LEVEL_MIN} and {BASS_LEVEL_MAX}"
+            )
+        payload = BASS_LEVEL_RANGE + bytes((level & 0xFF,))
+        try:
+            acknowledgement = self._transport.request(
+                SET_BASS_ENGINE, payload, RESPONSE_SET_BASS_ENGINE,
+            )
+            status = parse_set_anc_status(acknowledgement)
+        except TimeoutError:
+            status = None
+        return status, True
+
     def diagnostic_query(self, command: int, payload: bytes = b"",
                         wait: float = 0.5) -> tuple[dict[str, object], ...]:
         """Local fork: read-only raw query used to discover device capabilities.
@@ -551,7 +615,21 @@ class OpoSession:
             }
             return SafeEvent("feature_switches", named)
         if frame.command == NOTIFY_STATE and frame.payload:
+            # The device pushes the noise mode as [event, type, type, bitmap].
+            # Reading it lets the panel follow changes made in the phone app
+            # and proves a write that the device answers with a level instead
+            # of the requested mode.
+            if len(frame.payload) >= 4 and frame.payload[0] == 0x03 \
+                    and frame.payload[1] == 0x01 and frame.payload[2] == 0x01:
+                state = parse_anc_state(frame, self.profile.anc)
+                if state is not None:
+                    return SafeEvent("anc", {"mode": state.mode, "level": state.level})
             return SafeEvent("notification", {"event_code": frame.payload[0]})
+        if frame.payload[:2] == BASS_LEVEL_NOTICE and len(frame.payload) >= 3:
+            # The device echoes the bass engine range and the accepted value.
+            value = frame.payload[2]
+            level = value - 256 if value > 127 else value
+            return SafeEvent("bass_level", {"level": level})
         return None
 
     def _require_connected(self) -> None:

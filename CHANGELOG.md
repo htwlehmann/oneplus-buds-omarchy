@@ -3,9 +3,20 @@
 ## Unreleased — 0.1.0 release candidate
 
 - Add an owner-verified device profile for the OnePlus Nord Buds 3 Pro
-  (`064414`): measured ANC bitmap without Smart strength, seven native factory
+  (`064414`): measured ANC bitmap including Auto, seven native factory
   EQ slots without custom curves, plus device record, compatibility entry and
   regression tests that pin the measured wire values.
+- Bring the panel to feature parity with the phone app: the app's feature
+  switches (personalised noise cancellation, BassWave, low latency game mode,
+  wear detection, dual connection and more), a BassWave level slider from -10
+  to +10, a find-my-earbuds button, and the app's own ANC intensity names
+  (High, Moderate, Low, Auto) and equalizer names (Ausgewogen, Serenade, Bass).
+- Read and write the feature switches the way the phone app does: `0x010d`
+  with a count byte plus the wanted ids, and `0x0403` with the two byte
+  payload `[feature id, status]`, always confirmed by a fresh read.
+- Read and write the bass engine level (`0x0124` and `0x041b`), and follow the
+  noise mode the device pushes, so the panel also shows changes made in the
+  phone app.
 - Distinguish Verified, Community Tested and Experimental device evidence in the
   backend and panel; only Buds Pro and Buds Pro 2 remain hardware-verified.
 - Add a compact experimental-device notice and user-controlled compatibility

@@ -100,6 +100,9 @@ class BridgeProcessHost:
                 request_id=request_id,
             )
         except Exception:
+            # Local fork: keep the reason in the helper log. The frontend only
+            # ever saw a generic "bridge command failed" before.
+            traceback.print_exc()
             return {
                 "schema_version": SCHEMA_VERSION,
                 "type": "command_response",
