@@ -46,6 +46,22 @@ BarWidget {
     ? snapshot.feature_switches : {}
   readonly property bool featureSwitchesAvailable: !!(snapshot && snapshot.capabilities
     && snapshot.capabilities.indexOf("feature_switches") !== -1)
+  // Local fork: geometry probe for layout diagnostics.
+  readonly property real popupX: popup.x
+  readonly property real popupWidth: popup.width
+  readonly property real contentWidth: popup.contentWidth
+  readonly property real controlSectionsWidth: controlSections.width
+  readonly property real eqColumnWidth: eqColumn.width
+  readonly property real bandFlowWidth: customBandFlow.width
+  readonly property real scrollbarWidth: panelScroll.ScrollBar.vertical
+    ? panelScroll.ScrollBar.vertical.width : 0
+  readonly property bool scrollbarVisible: !!(panelScroll.ScrollBar.vertical
+    && panelScroll.ScrollBar.vertical.visible)
+  readonly property bool scrollbarActive: !!(panelScroll.ScrollBar.vertical
+    && panelScroll.ScrollBar.vertical.active)
+  readonly property real viewHeight: panelScroll.height
+  readonly property real contentHeight: panelScroll.contentHeight
+  readonly property real screenWidth: Screen.width
   readonly property bool bassEngineAvailable: !!(snapshot && snapshot.capabilities
     && snapshot.capabilities.indexOf("bass_engine") !== -1)
   readonly property int bassLevel: (snapshot && snapshot.bass_level !== null
@@ -464,8 +480,12 @@ BarWidget {
     bar: root.bar
     owner: root
     open: root.popupOpen
-    contentWidth: popup.fittedContentWidth(root.useTwoColumnLayout
-      ? Style.space(600) : Style.space(320))
+    // Local fork: the card must keep a constant width. The popup is clamped
+    // to the screen when it opens, using the width it has at that moment. A
+    // width that grows later - for example when the device snapshot arrives
+    // after the panel was opened - pushes the right edge of the card off the
+    // screen and cuts off the controls in the right-hand column.
+    contentWidth: popup.fittedContentWidth(Style.space(600))
     contentHeight: popup.fittedContentHeight(panelContent.implicitHeight)
 
     Flickable {
@@ -476,7 +496,10 @@ BarWidget {
       clip: true
       boundsBehavior: Flickable.StopAtBounds
       flickableDirection: Flickable.VerticalFlick
-      Controls.ScrollBar.vertical: Controls.ScrollBar {}
+      Controls.ScrollBar.vertical: Controls.ScrollBar {
+        id: panelScrollBar
+        policy: Controls.ScrollBar.AsNeeded
+      }
 
       function reveal(item) {
         var top = item.mapToItem(panelContent, 0, 0).y
@@ -487,7 +510,11 @@ BarWidget {
 
       Column {
         id: panelContent
-        width: panelScroll.width
+        // Local fork: the scroll bar overlays the flickable, so the content
+        // needs its own lane. Without it the bar covers the right edge of the
+        // panel and swallows clicks on the up/down buttons of the right-hand
+        // equalizer column.
+        width: panelScroll.width - (panelScrollBar.visible ? panelScrollBar.width : 0)
         spacing: Style.space(12)
 
         Text {
@@ -1099,6 +1126,20 @@ BarWidget {
         report_action: reportAction.visible,
         diagnostic_result: root.diagnosticResult,
         diag_api: 2,
+        panel_geometry: JSON.stringify({
+          popup_x: root.popupX,
+          popup_width: root.popupWidth,
+          content_width: root.contentWidth,
+          sections_width: root.controlSectionsWidth,
+          eq_column_width: root.eqColumnWidth,
+          band_flow_width: root.bandFlowWidth,
+          scrollbar_width: root.scrollbarWidth,
+          scrollbar_visible: root.scrollbarVisible,
+          scrollbar_active: root.scrollbarActive,
+          view_height: root.viewHeight,
+          content_height: root.contentHeight,
+          screen_width: root.screenWidth
+        }),
         last_response: root.lastResponse ? root.lastResponse : null,
         error: root.budsService ? String(root.budsService.lastError || "") : ""
       })
