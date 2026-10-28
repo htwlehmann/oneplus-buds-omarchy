@@ -5,6 +5,14 @@ This checkout is a fork of
 addition: an owner-verified device profile for the **OnePlus Nord Buds 3 Pro**
 (product `064414`).
 
+> **Handoff for a fresh session:** read
+> `~/src/oneplus-buds-research/HANDOFF.md` first. It carries the verified
+> protocol cheat sheet, the device state, the open tasks and the pitfalls of
+> this environment (QML cache, `keepLoaded`, exclusive RFCOMM channel). The
+> research artifacts live next to it: the decrypted device table of the phone
+> app (`whitelist.json`) and the decompiled app itself (`decompiled-app/`).
+
+
 - Local commit: `8706d2e` on `main`, also tagged `nord-buds-3-pro-2026-10-27`
   and kept on the branch `local/nord-buds-3-pro`.
 - `origin` still points at the upstream repository, so the plugin stays a
