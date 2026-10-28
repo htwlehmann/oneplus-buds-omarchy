@@ -85,3 +85,17 @@ session and existing subscriptions. Success still requires a fresh, correlated
 state query. The result and matching snapshot are captured atomically, and no
 monitoring restoration blocks successful response delivery. Cold/legacy paths
 retain conservative authentication; see the timing documentation for scope.
+
+## Local fork: touch controls
+
+For the verified Nord Buds 3 Pro, snapshot capability `touch_controls` enables
+the panel section. Snapshot field `touch_controls` is an array of bindings:
+`side`, `button`, `action`, `function`, display labels, `options` (`value`,
+`label`) and `writable`. Only known profile choices are writable.
+
+- `touch_controls` with `{}` refreshes and publishes the complete table.
+- `set_touch_control` with integer parameters `side`, `action`, `function`
+  writes one button-1 entry and returns `set_status` and `verified`, then
+  publishes actual readback. Only sides 1/2 are allowed. Failure to confirm
+  yields `verified: false`; transport or malformed-response failures return
+  an error and publish an unavailable/empty table. Writes are never retried.

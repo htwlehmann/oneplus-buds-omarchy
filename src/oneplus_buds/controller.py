@@ -12,6 +12,7 @@ from .models import ControllerSnapshot, ControlResult, EqControlResult, EqStatus
 from .profiles import profile_for_product
 from .protocol import FEATURE_SWITCH_NAMES, VersionRecord
 from .session import OpoSession, UnsupportedProductError
+from .touch import TouchBinding
 from .timing import AncRequestError, PhaseTimer
 
 
@@ -36,6 +37,7 @@ class BudsController:
         self._generation = 0
         self._eq_status: EqStatusResult | None = None
         self._bass_level: int | None = None
+        self._touch_bindings: tuple[TouchBinding, ...] = ()
         self._last_state_refresh: float = 0.0
 
     def start(self) -> ControllerSnapshot:
@@ -290,6 +292,38 @@ class BudsController:
             self._generation += 1
             return self.snapshot()
 
+    def touch_controls(self) -> None:
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            try:
+                self._touch_bindings = cast(OpoSession, self._session).touch_bindings()
+            except (OSError, RuntimeError):
+                self._close_session()
+                self._generation += 1
+                raise
+            self._generation += 1
+
+    def set_touch_control(self, side: int, action: int, function: int) -> dict[str, object]:
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            target = TouchBinding(side, 1, action, function)
+            try:
+                status, bindings = cast(OpoSession, self._session).set_touch_binding(target)
+            except (OSError, RuntimeError):
+                # The device may already have applied the change. Never retry
+                # a write or keep presenting stale assignments as confirmed.
+                self._close_session()
+                self._generation += 1
+                raise
+            self._touch_bindings = bindings
+            self._generation += 1
+            return {"side": side, "action": action, "function": function,
+                    "set_status": status, "verified": status in (None, 0) and target in bindings}
+
     def feature_switches(self) -> dict[str, bool]:
         """Read the device's feature switches through the phone app's shape."""
         with self._lock:
@@ -392,6 +426,7 @@ class BudsController:
                 generation=self._generation,
                 eq_status=self._eq_status,
                 bass_level=self._bass_level,
+                touch_bindings=self._touch_bindings,
             )
 
     def _connect_session(self) -> None:
@@ -409,6 +444,7 @@ class BudsController:
         self._apply_batch(batch)
 
     def _close_session(self) -> None:
+        self._touch_bindings = ()
         if self._session is not None:
             self._session.__exit__(None, None, None)
             self._session = None

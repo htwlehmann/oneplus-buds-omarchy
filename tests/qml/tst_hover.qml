@@ -14,6 +14,16 @@ TestCase {
   property var customRequest: null
   property int reportRequests: 0
   property string reportPath: ""
+  property var touchRequest: null
+  property var queuedRequests: []
+  function request(command, params) {
+   queuedRequests = queuedRequests.concat([{command:command, parameters:params}])
+   if (command === "eq_status") return eqStatus()
+   return nextId++
+  }
+  function setTouchControl(side, action, value) {
+   touchRequest = {side:side, action:action, function:value}; return nextId++
+  }
   function eqStatus() { eqStatusCalls++; return nextId++ }
   function setEq(value) { return nextId++ }
   function setCustomEq(entryId, gains) {
@@ -45,11 +55,72 @@ TestCase {
   service.customRequest = null
   service.reportRequests = 0
   service.reportPath = ""
+  service.touchRequest = null
+  service.queuedRequests = []
+  widget.panelQueue = []
   host.panelAvailableWidth = 600
   widget.popupOpen = false
   widget.pendingRequestId = -1
   widget.pendingKind = ""
   widget.reportDetailsOpen = false
+ }
+ function touchSnapshot() {
+  return {status:{model:"Nord", battery:{}}, anc_modes:[],
+   capabilities:["touch_controls"], session_connected:true, compatibility:"verified",
+   touch_controls:[
+    {side:1,button:1,action:2,action_label:"Double tap",function:6,function_label:"Next track",
+     writable:true,options:[{value:0,label:"None"},{value:5,label:"Previous track"},{value:6,label:"Next track"}]},
+    {side:2,button:1,action:2,action_label:"Double tap",function:254,function_label:"Unknown (254)",
+     writable:true,options:[{value:0,label:"None"},{value:6,label:"Next track"}]},
+    {side:1,button:1,action:4,action_label:"Touch & hold",function:8,function_label:"Switch noise control",
+     writable:false,options:[]}]}
+ }
+ function test_touch_controls_read_and_write_real_widget() {
+  service.snapshot = touchSnapshot()
+  widget.popupOpen = true
+  compare(service.queuedRequests[0].command, "touch_controls")
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  wait(0)
+  var left = findChild(widget, "touchSelector_1_2")
+  var right = findChild(widget, "touchSelector_2_2")
+  verify(left !== null)
+  verify(right !== null)
+  compare(left.currentText, "Next track")
+  compare(left.count, 3)
+  compare(right.currentText, "Unknown (254)")
+  compare(findChild(widget, "touchSelector_1_4").visible, false)
+  left.currentIndex = 1
+  left.activated(1)
+  compare(service.touchRequest.side, 1)
+  compare(service.touchRequest.action, 2)
+  compare(service.touchRequest.function, 5)
+  compare(left.currentText, "Next track")  // display only confirmed state
+  verify(!left.enabled)
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:false}}
+  wait(0)
+  verify(widget.outcome.indexOf("not confirmed") !== -1)
+  verify(findChild(widget, "touchSelector_1_2").enabled)
+  service.connection = "disconnected"
+  wait(0)
+  verify(!findChild(widget, "touchSelector_1_2").enabled)
+ }
+ function test_touch_controls_refresh_and_narrow_layout() {
+  service.snapshot = touchSnapshot()
+  host.panelAvailableWidth = 400
+  widget.popupOpen = true
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  wait(0)
+  var section = findChild(widget, "touchControlsSection")
+  verify(section.visible)
+  var right = findChild(widget, "touchSide_2")
+  var left = findChild(widget, "touchSide_1")
+  verify(right.y > left.y)
+  verify(right.x + right.width <= section.width)
+  findChild(widget, "refreshTouchControls").clicked()
+  compare(service.queuedRequests.length, 2)
+  service.snapshot = {status:{battery:{}},capabilities:[],anc_modes:[]}
+  wait(0)
+  verify(!section.visible)
  }
  function test_hover() {
   mouseMove(widget, -100, 50)

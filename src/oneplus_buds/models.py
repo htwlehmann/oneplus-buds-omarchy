@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 
 from .bluez import Device
 from .protocol import EqEntry, VersionRecord
+from .touch import TouchBinding
 
 
 @dataclass(frozen=True)
@@ -139,3 +140,4 @@ class ControllerSnapshot:
     generation: int
     eq_status: EqStatusResult | None = None
     bass_level: int | None = None
+    touch_bindings: tuple[TouchBinding, ...] = ()

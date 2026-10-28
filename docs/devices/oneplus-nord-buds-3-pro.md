@@ -115,6 +115,46 @@ echoes them back. The owner's unit reports the range `-10` to `+10`.
 
 `0x0400` with the payload `[01]` rings the earbuds, `[00]` stops the tone.
 
+## Touch controls (2026-10-28)
+
+The authenticated, payloadless query `0x0108` returns `0x8108` with
+`[status=00, count, (deviceType, button, action, function)…]`. The owner's unit
+reports ten entries: five for each earbud. Device type 1 is left, 2 is right;
+button 1 is touch. A single assignment is written with `0x0401`, payload
+`[01, deviceType, 01, action, function]`; its `0x8401` ACK contains status `00`.
+Each write is verified with a fresh correlated `0x0108`, never just the ACK.
+
+| Gesture | Wire action | Original function, both sides | Writable function IDs |
+|---|---:|---|---|
+| Single tap | 1 | None (0) | 0, 1 |
+| Double tap | 2 | Next track (6) | 0, 1, 2, 3, 5, 6, 17 |
+| Triple tap | 3 | Previous track (5) | 0, 2, 3, 5, 6, 17 |
+| Touch & hold | 4 | Switch noise control (8) | Display only |
+| Long hold | 6 | None (0) | 0, 11, 12 |
+
+Functions: 0 none, 1 play/pause, 2 play music, 3 voice assistant, 5 previous
+track, 6 next track, 11 volume up, 12 volume down, 17 game mode. Function
+labels come from `A9/d.java` in the phone app. Acceptance of an assignment
+does not prove its action is implemented by every connected audio host.
+
+The model table's support masks are 516 (single), 8807 (double), 8803 (triple)
+and 536 (long hold). They describe app function bits, **not** wire function
+IDs. `EarphoneUtils` (`model/repository/earphone/I.java`) maps app action 11
+to wire action 4. That fixed noise-control action and the separate call
+gestures are not changed by this implementation; configuring the noise-mode
+cycle would require another command and its own measurements.
+
+All 36 allowed side/action/function combinations were written, acknowledged
+with status `00`, and confirmed by a fresh query through the running plugin
+bridge. Each gesture was restored after testing; a final comparison confirmed
+the complete original ten-entry table was restored. The address-free evidence
+is in `docs/measurements/2026-10-28-nord-touch.json` and regressions are in
+`tests/test_nord_buds_3_pro.py` and `tests/test_touch.py`.
+
+The panel reads assignments on opening and offers Refresh for changes made
+in the phone app. Failed or uncertain reads invalidate the table and require
+a successful fresh read before editing again. No write is retried.
+
 ## Comparison with the upstream reference models
 
 The protocol layer is the shared OPOv1 family: 0xAA framing, RFCOMM channel 15,

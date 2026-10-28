@@ -13,6 +13,7 @@ from .timing import AncRequestError
 from .models import ControllerSnapshot, ControlResult, EqControlResult
 from .profiles import compatibility_for_product, profile_for_product
 from .protocol import FEATURE_SWITCH_NAMES
+from .touch import serialize_touch_controls
 from .report import build_snapshot_report, write_report
 from .service import BudsServiceRunner, ServiceState
 
@@ -54,6 +55,9 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         "reconnect_count": snapshot.reconnect_count,
         "generation": snapshot.generation,
         "bass_level": snapshot.bass_level,
+        "touch_controls": serialize_touch_controls(
+            snapshot.touch_bindings, profile.touch_functions if profile else {},
+            bool(profile and profile.verified and snapshot.session_connected)),
     }
 
 
@@ -184,6 +188,19 @@ class BudsFrontendBridge:
                     "frames": self.controller.diagnostic_query(
                         raw_command, payload, float(wait))
                 }
+            elif command == "touch_controls":
+                self._require_parameters(command, params, set())
+                self.controller.touch_controls()
+                snapshot = self.controller.snapshot()
+                result = {"touch_controls": serialize_snapshot(snapshot)["touch_controls"]}
+                self._on_snapshot(snapshot)
+            elif command == "set_touch_control":
+                self._require_parameters(command, params, {"side", "action", "function"})
+                for key in ("side", "action", "function"):
+                    if type(params[key]) is not int:
+                        raise ValueError(f"set_touch_control parameter '{key}' must be an integer")
+                result = self.controller.set_touch_control(params["side"], params["action"], params["function"])
+                self._on_snapshot(self.controller.snapshot())
             elif command == "feature_switches":
                 # Local fork: read the device feature switches.
                 result = {"feature_switches": self.controller.feature_switches()}
@@ -248,6 +265,8 @@ class BudsFrontendBridge:
                 error={"code": "invalid_parameters", "message": self._safe_error(error)},
             )
         except (OSError, RuntimeError) as error:
+            if command in ("touch_controls", "set_touch_control"):
+                self._on_snapshot(self.controller.snapshot())
             self._remember_error(error)
             return self._response(
                 command,

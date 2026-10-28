@@ -115,6 +115,12 @@ Item {
   }
 
   // Local fork: the phone app's extra controls.
+  function setTouchControl(side, action, value) {
+    return request("set_touch_control", {
+      side: Number(side), action: Number(action), function: Number(value)
+    })
+  }
+
   function setFeatureSwitch(feature, enabled) {
     return request("set_feature_switch", {
       feature: String(feature || ""),

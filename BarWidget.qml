@@ -46,6 +46,10 @@ BarWidget {
     ? snapshot.feature_switches : {}
   readonly property bool featureSwitchesAvailable: !!(snapshot && snapshot.capabilities
     && snapshot.capabilities.indexOf("feature_switches") !== -1)
+  readonly property bool touchControlsAvailable: !!(snapshot && snapshot.capabilities
+    && snapshot.capabilities.indexOf("touch_controls") !== -1)
+  readonly property var touchControls: snapshot && snapshot.touch_controls
+    ? snapshot.touch_controls : []
   // Local fork: the heading is the name the device carries, not a hard coded
   // model name. BlueZ keeps the name the device reports and a separate alias
   // that the user can rename.
@@ -176,6 +180,8 @@ BarWidget {
         if (snapshot && snapshot.capabilities
             && snapshot.capabilities.indexOf("bass_engine") !== -1)
           panelQueue.push({ kind: "bass_status", command: "bass_status", params: {} })
+        if (touchControlsAvailable)
+          panelQueue.push({ kind: "touch_read", command: "touch_controls", params: {} })
         sendNextPanelRequest()
       }
     } else if (!hitArea.containsMouse) {
@@ -191,6 +197,23 @@ BarWidget {
   }
 
   function close() { popupOpen = false }
+
+  function refreshTouchControls() {
+    if (!touchControlsAvailable || connection !== "connected" || pendingRequestId >= 0) return
+    panelQueue.push({kind: "touch_read", command: "touch_controls", params: {}})
+    sendNextPanelRequest()
+  }
+
+  function setTouchControl(side, action, value) {
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    var requestId = budsService.setTouchControl(side, action, value)
+    if (requestId === null) return
+    pendingRequestId = requestId
+    pendingKind = "touch_write"
+    pendingMode = "touch controls"
+    outcome = ""
+    requestWatchdog.restart()
+  }
 
   // Local fork: the panel loads its state with a small request queue, because
   // the bridge answers one command at a time.
@@ -432,7 +455,9 @@ BarWidget {
       syncCustomSlotFromEq()
     }
     if (response.ok === true) {
-      if (response.result && response.result.verified === true) {
+      if (completedKind === "touch_write" && (!response.result || response.result.verified !== true)) {
+        outcome = "Touch assignment was not confirmed by earbuds"
+      } else if (response.result && response.result.verified === true) {
         outcome = "Verified on earbuds"
       } else if (completedKind === "bass") {
         outcome = "Bass level sent"
@@ -984,6 +1009,147 @@ BarWidget {
         }
 
         Column {
+          id: touchSection
+          objectName: "touchControlsSection"
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.touchControlsAvailable
+
+          Row {
+            width: parent.width
+            spacing: Style.space(8)
+            Text {
+              width: parent.width - refreshTouchButton.width - parent.spacing
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Touch controls"
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+            Button {
+              id: refreshTouchButton
+              objectName: "refreshTouchControls"
+              width: Style.space(90)
+              text: "Refresh"
+              bordered: true
+              foreground: root.bar.foreground
+              background: root.bar.background
+              accent: Color.accent
+              fontFamily: root.bar.fontFamily
+              enabled: root.connection === "connected" && root.pendingRequestId < 0
+              onClicked: root.refreshTouchControls()
+            }
+          }
+
+          Text {
+            visible: root.touchControls.length === 0
+            width: parent.width
+            text: root.pendingKind === "touch_read" ? "Reading touch controls…"
+              : "No touch assignments loaded. Use Refresh to read the earbuds."
+            color: root.bar.foreground
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.Wrap
+          }
+
+          Flow {
+            id: touchColumns
+            width: parent.width
+            spacing: Style.space(16)
+            Repeater {
+              model: [1, 2]
+              delegate: Column {
+                id: touchSide
+                required property int modelData
+                objectName: "touchSide_" + modelData
+                width: touchColumns.width >= Style.space(500)
+                  ? (touchColumns.width - touchColumns.spacing) / 2 : touchColumns.width
+                spacing: Style.space(6)
+                visible: root.touchControls.length > 0
+
+                Text {
+                  text: touchSide.modelData === 1 ? "Left earbud" : "Right earbud"
+                  color: root.bar.foreground
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: true
+                }
+                Repeater {
+                  model: root.touchControls.filter(function(entry) {
+                    return entry.side === touchSide.modelData && entry.button === 1
+                  })
+                  delegate: Column {
+                    id: touchRow
+                    required property var modelData
+                    width: touchSide.width
+                    spacing: Style.space(2)
+                    Text {
+                      width: parent.width
+                      text: touchRow.modelData.action_label
+                      color: root.bar.foreground
+                      opacity: 0.72
+                      font.family: root.bar.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+                    Controls.ComboBox {
+                      objectName: "touchSelector_" + touchRow.modelData.side + "_" + touchRow.modelData.action
+                      width: parent.width
+                      visible: touchRow.modelData.writable
+                      property var choices: {
+                        var options = touchRow.modelData.options || []
+                        if (!options.some(function(o) { return o.value === touchRow.modelData.function }))
+                          return [{value: touchRow.modelData.function, label: touchRow.modelData.function_label}].concat(options)
+                        return options
+                      }
+                      model: choices
+                      textRole: "label"
+                      currentIndex: {
+                        for (var i = 0; i < choices.length; i++)
+                          if (choices[i].value === touchRow.modelData.function) return i
+                        return -1
+                      }
+                      enabled: root.connection === "connected" && root.pendingRequestId < 0
+                        && snapshot && snapshot.session_connected === true
+                      onActivated: function(index) {
+                        var value = choices[index].value
+                        if (value !== touchRow.modelData.function)
+                          root.setTouchControl(touchRow.modelData.side, touchRow.modelData.action, value)
+                        // Keep showing confirmed state until readback arrives,
+                        // including when validation or transmission fails.
+                        currentIndex = Qt.binding(function() {
+                          for (var i = 0; i < choices.length; i++)
+                            if (choices[i].value === touchRow.modelData.function) return i
+                          return -1
+                        })
+                      }
+                    }
+                    Text {
+                      width: parent.width
+                      visible: !touchRow.modelData.writable
+                      text: touchRow.modelData.function_label
+                      color: root.bar.foreground
+                      font.family: root.bar.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                      wrapMode: Text.Wrap
+                    }
+                  }
+                }
+              }
+            }
+          }
+          Text {
+            width: parent.width
+            text: "Call gestures use the earbuds’ fixed settings."
+            color: root.bar.foreground
+            opacity: 0.6
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.Wrap
+          }
+        }
+
+        Column {
           id: compatibilityNotice
           objectName: "compatibilityNotice"
           width: parent.width
@@ -1154,6 +1320,7 @@ BarWidget {
           textFormat: Text.PlainText
           text: root.pendingRequestId >= 0
             ? (root.pendingKind === "eq_status" ? "Reading native EQ…"
+              : root.pendingKind === "touch_read" ? "Reading touch controls…"
               : root.pendingKind === "diagnostic_report" ? "Saving diagnostic report…"
               : "Verifying " + BarModel.titleCase(root.pendingMode) + "…") : root.outcome
           color: root.bar.foreground
@@ -1222,6 +1389,7 @@ BarWidget {
         eq: root.eqStatus,
         bass_level: root.snapshot ? root.snapshot.bass_level : null,
         feature_switches: root.snapshot ? root.snapshot.feature_switches : null,
+        touch_controls: root.touchControls,
         anc_labels: root.snapshot ? root.snapshot.anc_labels : null,
         capabilities: root.snapshot ? root.snapshot.capabilities : null,
         compatibility: root.compatibilityKind,

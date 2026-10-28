@@ -68,6 +68,8 @@ from .protocol import (
     parse_set_eq_status,
 )
 from .transport import RfcommTransport
+from .protocol import QUERY_TOUCH, RESPONSE_TOUCH, SET_TOUCH, RESPONSE_SET_TOUCH
+from .touch import TouchBinding, parse_touch_bindings
 
 
 class UnsupportedProductError(RuntimeError):
@@ -482,6 +484,35 @@ class OpoSession:
             setup.events + received.events,
             setup.ignored_frames + received.ignored_frames,
         )
+
+    def touch_bindings(self) -> tuple[TouchBinding, ...]:
+        self._require_connected()
+        if not self.profile.touch_functions:
+            raise ValueError("touch controls are not supported by this device profile")
+        frame = self._transport.request(QUERY_TOUCH, b"", RESPONSE_TOUCH)
+        try:
+            return parse_touch_bindings(frame)
+        except ValueError as error:
+            raise RuntimeError(str(error)) from error
+
+    def set_touch_binding(self, binding: TouchBinding) -> tuple[int | None, tuple[TouchBinding, ...]]:
+        self._require_connected()
+        if not self._authenticated:
+            raise RuntimeError("session authentication has not completed")
+        if (not self.profile.verified or binding.device_type not in (1, 2)
+                or binding.button != 1
+                or binding.function not in self.profile.touch_functions.get(binding.action, ())):
+            raise ValueError("touch assignment is not allowed for this device profile")
+        if not any(item.key == binding.key for item in self.touch_bindings()):
+            raise ValueError("touch gesture was not reported by this device")
+        try:
+            ack = self._transport.request(SET_TOUCH, binding.write_payload(), RESPONSE_SET_TOUCH)
+            if len(ack.payload) != 1:
+                raise RuntimeError("device returned malformed touch acknowledgement")
+            status = ack.payload[0]
+        except TimeoutError:
+            status = None
+        return status, self.touch_bindings()
 
     def feature_switches(self, feature_ids: tuple[int, ...]) -> dict[int, bool]:
         """Read the device's feature switches.

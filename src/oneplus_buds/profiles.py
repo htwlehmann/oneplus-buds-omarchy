@@ -95,6 +95,8 @@ class DeviceProfile:
     # owner an audio connection and a crashed phone app, so that switch is
     # deliberately not writable here.
     writable_features: frozenset[str] = frozenset()
+    # Wire action -> allowed function IDs. Empty means no touch writes.
+    touch_functions: dict[int, tuple[int, ...]] = field(default_factory=dict)
 
     @property
     def verified(self) -> bool:
@@ -204,6 +206,7 @@ PROFILES = {
                 "bass_engine",
                 "feature_switches",
                 "find_earbuds",
+                "touch_controls",
             }
         ),
         # Verified on the owner's hardware: writing these switches changed the
@@ -215,6 +218,14 @@ PROFILES = {
             "bass_engine",
             "personal_noise",
         }),
+        # App support masks: 516, 8807, 8803, 536. App action 11 maps
+        # to wire action 4 (fixed noise-control hold, not a selector).
+        touch_functions={
+            1: (0, 1),
+            2: (0, 1, 2, 3, 5, 6, 17),
+            3: (0, 2, 3, 5, 6, 17),
+            6: (0, 11, 12),
+        },
         # Owner-verified on real hardware: see
         # docs/devices/oneplus-nord-buds-3-pro.md. The ANC bitmap and the seven
         # factory EQ IDs were measured on this unit, not copied from another

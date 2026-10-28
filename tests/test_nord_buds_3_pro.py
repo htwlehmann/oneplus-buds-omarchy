@@ -94,8 +94,15 @@ class NordBuds3ProProfileTests(unittest.TestCase):
                 "bass_engine",
                 "feature_switches",
                 "find_earbuds",
+                "touch_controls",
             }),
         )
+
+    def test_touch_choices_pin_the_36_hardware_verified_round_trips(self) -> None:
+        self.assertEqual(self.profile.touch_functions, {
+            1: (0, 1), 2: (0, 1, 2, 3, 5, 6, 17),
+            3: (0, 2, 3, 5, 6, 17), 6: (0, 11, 12),
+        })
 
 
 if __name__ == "__main__":
