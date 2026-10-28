@@ -81,6 +81,7 @@ TestCase {
   compare(service.queuedRequests[0].command, "touch_controls")
   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
   wait(0)
+  findChild(widget, "touchControlsDisclosure").clicked()
   var left = findChild(widget, "touchSelector_1_2")
   var right = findChild(widget, "touchSelector_2_2")
   verify(left !== null)
@@ -112,6 +113,8 @@ TestCase {
   wait(0)
   var section = findChild(widget, "touchControlsSection")
   verify(section.visible)
+  findChild(widget, "touchControlsDisclosure").clicked()
+  wait(0)
   var right = findChild(widget, "touchSide_2")
   var left = findChild(widget, "touchSide_1")
   verify(right.y > left.y)
@@ -164,6 +167,76 @@ TestCase {
   service.snapshot = {status:{battery:{}},anc_modes:[]}
   wait(220)
   compare(widget.width, compact)
+ }
+ function test_disclosures_default_closed_independent_and_keep_edits() {
+  var state = touchSnapshot()
+  state.capabilities.push("eq")
+  state.custom_eq_write_verified = true
+  state.eq = {current_id:7,current_name:"My curve",gain_step_db:1,
+   presets:[{id:3,key:"balanced",name:"Balanced"}],
+   custom_entries:[{eq_id:7,name:"My curve",min_gain_db:-6,max_gain_db:6,
+    bands:[{frequency_hz:62,gain_db:3},{frequency_hz:250,gain_db:1}]}]}
+  service.snapshot = state
+  widget.popupOpen = true
+  while (widget.pendingRequestId >= 0) {
+   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  }
+  wait(0)
+  var customHeader = findChild(widget, "customEqDisclosure")
+  var touchHeader = findChild(widget, "touchControlsDisclosure")
+  var bands = findChild(widget, "customEqBands")
+  var touch = findChild(widget, "touchSelector_1_2")
+  verify(customHeader !== null)
+  verify(touchHeader !== null)
+  verify(!bands.visible)
+  verify(!touch.visible)
+  verify(findChild(widget, "currentEqLabel").visible)
+  compare(findChild(widget, "currentEqLabel").text, "Current: My curve")
+  var compactHeight = widget.panelHeight
+  var fixedWidth = widget.contentWidth
+  customHeader.clicked()
+  wait(0)
+  verify(bands.visible)
+  verify(!touch.visible)
+  tryVerify(function() { return widget.panelHeight > compactHeight })
+  compare(widget.contentWidth, fixedWidth)
+  var gain = findChild(widget, "customEqGain_62")
+  gain.value = 5
+  gain.forceActiveFocus()
+  verify(gain.activeFocus)
+  customHeader.clicked()
+  wait(0)
+  verify(!bands.visible)
+  verify(!gain.activeFocus)
+  tryCompare(widget, "panelHeight", compactHeight)
+  touchHeader.clicked()
+  wait(0)
+  verify(touch.visible)
+  verify(!bands.visible)
+  compare(widget.contentWidth, fixedWidth)
+  touch.forceActiveFocus()
+  verify(touch.activeFocus)
+  touchHeader.clicked()
+  verify(!touch.activeFocus)
+  customHeader.clicked()
+  wait(0)
+  compare(gain.value, 5)
+  compare(service.customRequest, null)
+  compare(service.touchRequest, null)
+  touchHeader.clicked()
+  gain.forceActiveFocus()
+  verify(gain.activeFocus)
+  widget.close()
+  widget.popupOpen = true
+  wait(0)
+  verify(!bands.visible)
+  verify(!touch.visible)
+  verify(!gain.activeFocus)
+  compare(widget.contentWidth, fixedWidth)
+  service.snapshot = {status:{battery:{}},capabilities:[],anc_modes:[]}
+  wait(0)
+  verify(!customHeader.visible)
+  verify(!touchHeader.visible)
  }
  function test_native_eq_panel_is_capability_driven() {
   service.snapshot = ({

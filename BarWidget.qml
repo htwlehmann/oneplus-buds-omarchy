@@ -122,6 +122,8 @@ BarWidget {
   property string pendingKind: ""
   property int customSlotIndex: 0
   property bool customSelectionDirty: false
+  property bool customEqExpanded: false
+  property bool touchControlsExpanded: false
   property bool reportDetailsOpen: false
   property bool reportSaved: false
   property string proposedReportFilename: ""
@@ -160,6 +162,8 @@ BarWidget {
 
   onPopupOpenChanged: {
     if (popupOpen) {
+      customEqExpanded = false
+      touchControlsExpanded = false
       customSelectionDirty = false
       syncCustomSlotFromEq()
       collapseTimer.stop()
@@ -758,6 +762,7 @@ BarWidget {
 
             Text {
               width: parent.width
+              objectName: "currentEqLabel"
               text: root.eqStatus ? "Current: " + root.eqStatus.current_name : "Loading native EQ…"
               textFormat: Text.PlainText
               color: root.bar.foreground
@@ -848,30 +853,37 @@ BarWidget {
               }
             }
 
-            Text {
+            Button {
+              objectName: "customEqDisclosure"
               width: parent.width
               visible: root.customEqEntries.length > 0
-              text: "Custom EQ"
-              textFormat: Text.PlainText
-              color: root.bar.foreground
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              font.bold: true
-              topPadding: Style.space(3)
+              text: (root.customEqExpanded ? "▾  " : "▸  ") + "Custom EQ"
+              leftAlign: true
+              bordered: true
+              foreground: root.bar.foreground
+              background: root.bar.background
+              accent: Color.accent
+              fontFamily: root.bar.fontFamily
+              focusable: true
+              onActiveFocusChanged: if (activeFocus) panelScroll.reveal(this)
+              onClicked: root.customEqExpanded = !root.customEqExpanded
             }
 
             Controls.ComboBox {
               width: parent.width
-              visible: root.customEqEntries.length > 0
+              visible: root.customEqExpanded && root.customEqEntries.length > 0
               model: root.customEqEntries.map(function(entry) { return entry.name })
               currentIndex: root.customSlotIndex
-              enabled: root.pendingRequestId < 0
+              enabled: root.customEqExpanded && root.pendingRequestId < 0
               onActivated: function(index) { root.selectCustomSlot(index) }
             }
 
             Flow {
               id: customBandFlow
+              objectName: "customEqBands"
               width: parent.width
+              visible: root.customEqExpanded && root.customEqEntries.length > 0
+              enabled: root.customEqExpanded
               spacing: Style.space(5)
 
               Repeater {
@@ -893,6 +905,7 @@ BarWidget {
                   }
                   Controls.SpinBox {
                     id: gainBox
+                    objectName: "customEqGain_" + modelData.frequency_hz
                     width: parent.width
                     from: root.selectedCustom ? root.selectedCustom.min_gain_db : -6
                     to: root.selectedCustom ? root.selectedCustom.max_gain_db : 6
@@ -912,11 +925,11 @@ BarWidget {
             Button {
               width: parent.width
               height: Math.max(implicitHeight, Style.space(32))
-              visible: root.selectedCustom !== null
+              visible: root.customEqExpanded && root.selectedCustom !== null
               text: "Apply " + (root.selectedCustom ? root.selectedCustom.name : "custom EQ")
               bordered: true
               leftAlign: true
-              enabled: root.snapshot && root.snapshot.custom_eq_write_verified === true
+              enabled: root.customEqExpanded && root.snapshot && root.snapshot.custom_eq_write_verified === true
                 && root.pendingRequestId < 0
               opacity: enabled ? 1.0 : 0.5
               foreground: root.bar.foreground
@@ -1018,32 +1031,39 @@ BarWidget {
           Row {
             width: parent.width
             spacing: Style.space(8)
-            Text {
-              width: parent.width - refreshTouchButton.width - parent.spacing
-              anchors.verticalCenter: parent.verticalCenter
-              text: "Touch controls"
-              color: root.bar.foreground
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              font.bold: true
+            Button {
+              objectName: "touchControlsDisclosure"
+              width: parent.width - (refreshTouchButton.visible
+                ? refreshTouchButton.width + parent.spacing : 0)
+              text: (root.touchControlsExpanded ? "▾  " : "▸  ") + "Touch controls"
+              leftAlign: true
+              bordered: true
+              foreground: root.bar.foreground
+              background: root.bar.background
+              accent: Color.accent
+              fontFamily: root.bar.fontFamily
+              focusable: true
+              onActiveFocusChanged: if (activeFocus) panelScroll.reveal(this)
+              onClicked: root.touchControlsExpanded = !root.touchControlsExpanded
             }
             Button {
               id: refreshTouchButton
               objectName: "refreshTouchControls"
               width: Style.space(90)
               text: "Refresh"
+              visible: root.touchControlsExpanded
               bordered: true
               foreground: root.bar.foreground
               background: root.bar.background
               accent: Color.accent
               fontFamily: root.bar.fontFamily
-              enabled: root.connection === "connected" && root.pendingRequestId < 0
+              enabled: root.touchControlsExpanded && root.connection === "connected" && root.pendingRequestId < 0
               onClicked: root.refreshTouchControls()
             }
           }
 
           Text {
-            visible: root.touchControls.length === 0
+            visible: root.touchControlsExpanded && root.touchControls.length === 0
             width: parent.width
             text: root.pendingKind === "touch_read" ? "Reading touch controls…"
               : "No touch assignments loaded. Use Refresh to read the earbuds."
@@ -1056,6 +1076,8 @@ BarWidget {
           Flow {
             id: touchColumns
             width: parent.width
+            visible: root.touchControlsExpanded
+            enabled: root.touchControlsExpanded
             spacing: Style.space(16)
             Repeater {
               model: [1, 2]
@@ -1140,6 +1162,7 @@ BarWidget {
           }
           Text {
             width: parent.width
+            visible: root.touchControlsExpanded
             text: "Call gestures use the earbuds’ fixed settings."
             color: root.bar.foreground
             opacity: 0.6
