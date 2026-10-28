@@ -795,25 +795,34 @@ BarWidget {
             spacing: Style.space(5)
             visible: root.eqAvailable
 
-            Text {
+            Row {
+              id: eqHeading
+              objectName: "eqHeading"
               width: parent.width
-              text: "Earbud EQ"
-              textFormat: Text.PlainText
-              color: root.bar.foreground
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              font.bold: true
-            }
+              spacing: Style.space(8)
 
-            Text {
-              width: parent.width
-              objectName: "currentEqLabel"
-              text: root.eqStatus ? "Current: " + root.eqStatus.current_name : "Loading native EQ…"
-              textFormat: Text.PlainText
-              color: root.bar.foreground
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              wrapMode: Text.Wrap
+              Text {
+                id: eqHeadingTitle
+                objectName: "eqHeadingTitle"
+                text: "Earbud EQ"
+                textFormat: Text.PlainText
+                color: root.bar.foreground
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.bold: true
+              }
+
+              Text {
+                width: Math.max(0, eqHeading.width - eqHeadingTitle.width - eqHeading.spacing)
+                objectName: "currentEqLabel"
+                text: root.eqStatus ? "Current: " + root.eqStatus.current_name : "Loading native EQ…"
+                textFormat: Text.PlainText
+                color: root.bar.foreground
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                horizontalAlignment: Text.AlignRight
+                elide: Text.ElideRight
+              }
             }
 
             Flow {

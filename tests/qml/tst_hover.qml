@@ -268,8 +268,10 @@ TestCase {
   var bass = findChild(widget, "bassWaveSection")
   verify(bass !== null)
   verify(customHeader.mapToItem(widget, 0, 0).y < bass.mapToItem(widget, 0, 0).y)
-  compare(customHeader.mapToItem(widget, 0, 0).x, findChild(widget, "currentEqLabel").mapToItem(widget, 0, 0).x)
-  compare(customHeader.width, findChild(widget, "currentEqLabel").width)
+  compare(customHeader.mapToItem(widget, 0, 0).x, findChild(widget, "eqHeading").mapToItem(widget, 0, 0).x)
+  compare(customHeader.width, findChild(widget, "eqHeading").width)
+  compare(findChild(widget, "currentEqLabel").y, findChild(widget, "eqHeadingTitle").y)
+  verify(findChild(widget, "currentEqLabel").x > findChild(widget, "eqHeadingTitle").x)
   var compactHeight = widget.panelHeight
   var fixedWidth = widget.contentWidth
   customHeader.clicked()
