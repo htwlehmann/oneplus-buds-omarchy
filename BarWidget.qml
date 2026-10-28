@@ -94,6 +94,9 @@ BarWidget {
 
   property bool popupOpen: false
   property int pendingRequestId: -1
+  // Local fork: the find-my-earbuds tone is a toggle. Like the phone app,
+  // the tone stops when the panel is closed.
+  property bool finding: false
   // Local fork: diagnostic channel for read-only protocol discovery.
   property int diagnosticRequestId: -1
   property string diagnosticResult: ""
@@ -164,6 +167,13 @@ BarWidget {
       }
     } else if (!hitArea.containsMouse) {
       collapseTimer.restart()
+    }
+    // Local fork: like the phone app, the find-my-earbuds tone stops when the
+    // panel is closed.
+    if (!popupOpen && finding) {
+      finding = false
+      if (budsService && connection === "connected")
+        budsService.findEarbuds(false)
     }
   }
 
@@ -247,11 +257,11 @@ BarWidget {
 
   function findEarbuds() {
     if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
-    var requestId = budsService.findEarbuds(true)
+    var requestId = budsService.findEarbuds(!finding)
     if (requestId === null) { outcome = "Could not start request"; return }
     pendingRequestId = requestId
     pendingKind = "find"
-    pendingMode = "find"
+    pendingMode = finding ? "stop" : "find"
     outcome = ""
   }
 
@@ -865,7 +875,7 @@ BarWidget {
               height: Math.max(implicitHeight, Style.space(32))
               visible: snapshot && snapshot.capabilities
                 && snapshot.capabilities.indexOf("find_earbuds") !== -1
-              text: "Find my earbuds"
+              text: root.finding ? "Stop ringing" : "Find my earbuds"
               bordered: true
               leftAlign: true
               enabled: root.connection === "connected" && root.pendingRequestId < 0
