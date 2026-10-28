@@ -89,6 +89,12 @@ class DeviceProfile:
     eq: EqProfile | None
     capabilities: frozenset[str]
     compatibility: CompatibilityState
+    # Feature switches that may be written from the plugin. A switch that is
+    # not listed stays read-only. Switching the audio codec from the control
+    # channel makes the earbuds reset their Bluetooth link, which cost the
+    # owner an audio connection and a crashed phone app, so that switch is
+    # deliberately not writable here.
+    writable_features: frozenset[str] = frozenset()
 
     @property
     def verified(self) -> bool:
@@ -200,6 +206,15 @@ PROFILES = {
                 "find_earbuds",
             }
         ),
+        # Verified on the owner's hardware: writing these switches changed the
+        # device state and a fresh read confirmed it. Everything else stays
+        # read-only until it has been tested the same way. "high_quality_audio"
+        # is left out on purpose: it renegotiates the audio codec and resets
+        # the Bluetooth link of the earbuds.
+        writable_features=frozenset({
+            "bass_engine",
+            "personal_noise",
+        }),
         # Owner-verified on real hardware: see
         # docs/devices/oneplus-nord-buds-3-pro.md. The ANC bitmap and the seven
         # factory EQ IDs were measured on this unit, not copied from another

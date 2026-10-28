@@ -142,12 +142,15 @@ var FEATURE_ORDER = [
 function featureList(snapshot) {
   var switches = snapshot && snapshot.feature_switches
   if (!switches || typeof switches !== "object") return []
+  var writable = snapshot && Array.isArray(snapshot.writable_features)
+    ? snapshot.writable_features : []
   var result = []
   for (var i = 0; i < FEATURE_ORDER.length; i++) {
     var name = FEATURE_ORDER[i]
     if (typeof switches[name] === "boolean")
       result.push({ name: name, label: FEATURE_LABELS[name] || titleCase(name),
-        enabled: switches[name] })
+        enabled: switches[name],
+        writable: writable.indexOf(name) !== -1 })
   }
   return result
 }

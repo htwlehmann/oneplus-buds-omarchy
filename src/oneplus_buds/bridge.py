@@ -45,6 +45,7 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         "custom_eq_write_verified": bool(
             profile and profile.verified and profile.eq and profile.eq.custom_write_verified
         ),
+        "writable_features": sorted(profile.writable_features) if profile else [],
         "feature_switches": dict(snapshot.feature_switches),
         "session_connected": snapshot.session_connected,
         "advertised_event_codes": list(snapshot.advertised_event_codes),

@@ -809,19 +809,25 @@ BarWidget {
 
                 Text {
                   width: parent.width - Style.space(56)
-                  text: modelData.label
+                  text: modelData.label + (modelData.writable ? "" : "  (read-only)")
                   textFormat: Text.PlainText
                   color: root.bar.foreground
                   font.family: root.bar.fontFamily
                   font.pixelSize: Style.font.bodySmall
                   elide: Text.ElideRight
+                  opacity: modelData.writable ? 1.0 : 0.6
                 }
 
                 ToggleSwitch {
                   width: Style.space(40)
                   checked: modelData.enabled
                   busy: root.pendingRequestId >= 0
-                  enabled: root.connection === "connected" && root.pendingRequestId < 0
+                  // Local fork: switches that are not verified for this model
+                  // stay visible but cannot be written.
+                  interactive: modelData.writable
+                  enabled: modelData.writable && root.connection === "connected"
+                    && root.pendingRequestId < 0
+                  opacity: modelData.writable ? 1.0 : 0.6
                   onToggled: root.toggleFeature(modelData.name, !modelData.enabled)
                 }
               }

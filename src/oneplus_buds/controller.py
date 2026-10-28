@@ -307,9 +307,14 @@ class BudsController:
             self._require_running()
             if self._session is None:
                 self.refresh()
+            name = FEATURE_SWITCH_NAMES.get(feature_id, f"feature_{feature_id:02x}")
+            profile = profile_for_product(self._status.product_id) if self._status else None
+            if profile is None or name not in profile.writable_features:
+                raise ValueError(
+                    f"the {name} switch is read-only for this device model"
+                )
             status, verified = cast(OpoSession, self._session).set_feature_switch(
                 feature_id, enabled)
-            name = FEATURE_SWITCH_NAMES.get(feature_id, f"feature_{feature_id:02x}")
             if verified:
                 self._feature_switches[name] = enabled
             self._generation += 1
