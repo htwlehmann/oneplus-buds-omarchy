@@ -65,6 +65,17 @@ BarWidget {
         snapshot && snapshot.status ? snapshot.status.product_id : null)
   }
 
+  // Local fork: a lost connection invalidates a request that can no longer
+  // be answered, so the panel must not stay disabled.
+  onConnectionChanged: {
+    if (connection !== "connected" && pendingRequestId >= 0) {
+      pendingRequestId = -1
+      pendingKind = ""
+      pendingMode = ""
+      requestWatchdog.stop()
+    }
+  }
+
   property bool popupOpen: false
   property int pendingRequestId: -1
   // Local fork: diagnostic channel for read-only protocol discovery.
@@ -116,6 +127,7 @@ BarWidget {
       customSelectionDirty = false
       syncCustomSlotFromEq()
       collapseTimer.stop()
+      requestWatchdog.stop()
       if (bar) bar.hideTooltip(root)
       // Local fork: load the feature switches and the bass engine level that
       // the phone app shows, so the panel starts with the real state. The
@@ -153,6 +165,19 @@ BarWidget {
     if (requestId === null) return
     pendingRequestId = requestId
     pendingKind = entry.kind
+    // Local fork: a request can be lost when the helper restarts underneath
+    // it. Without a watchdog the panel would stay disabled forever.
+    requestWatchdog.restart()
+  }
+
+  // Local fork: give up on a request that never gets an answer.
+  function abandonPendingRequest() {
+    if (pendingRequestId < 0) return
+    pendingRequestId = -1
+    pendingKind = ""
+    pendingMode = ""
+    outcome = "The request timed out"
+    sendNextPanelRequest()
   }
 
   function selectAnc(mode) {
@@ -373,6 +398,14 @@ BarWidget {
     id: collapseTimer
     interval: 300
     onTriggered: if (!hitArea.containsMouse && !root.popupOpen) root.hoverExpanded = false
+  }
+
+  // Local fork: watchdog for a bridge request that never gets an answer.
+  Timer {
+    id: requestWatchdog
+    interval: 15000
+    repeat: false
+    onTriggered: root.abandonPendingRequest()
   }
 
   Item {
