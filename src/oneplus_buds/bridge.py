@@ -225,6 +225,13 @@ class BudsFrontendBridge:
                 # Local fork: read the bass engine range and level.
                 self._require_parameters(command, params, set())
                 result = self.controller.bass_engine_status()
+            elif command == "set_device_name":
+                # Local fork: rename the device in BlueZ.
+                self._require_parameters(command, params, {"name"})
+                name = params["name"]
+                if not isinstance(name, str):
+                    raise ValueError("set_device_name parameter 'name' must be a string")
+                result = self.controller.set_device_name(name)
             else:
                 return self._response(
                     command,

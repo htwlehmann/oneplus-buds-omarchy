@@ -7,6 +7,7 @@ from typing import cast
 
 from .lifecycle_trace import mark
 from .api import BudsBackend
+from .bluez import read_device_alias, set_device_alias
 from .models import ControllerSnapshot, ControlResult, EqControlResult, EqStatusResult, EventBatch, StatusResult
 from .profiles import profile_for_product
 from .protocol import FEATURE_SWITCH_NAMES, VersionRecord
@@ -253,6 +254,11 @@ class BudsController:
         if profile is None:
             return
         try:
+            if self.address and self._status is not None:
+                alias = read_device_alias(self.address)
+                if alias and alias != self._status.device.alias:
+                    self._status = replace(
+                        self._status, device=replace(self._status.device, alias=alias))
             if "feature_switches" in profile.capabilities:
                 switches = cast(OpoSession, self._session).feature_switches(
                     tuple(FEATURE_SWITCH_NAMES))
@@ -357,6 +363,21 @@ class BudsController:
             self._bass_level = current
             self._generation += 1
             return {"min": minimum, "max": maximum, "level": current}
+
+    def set_device_name(self, name: str) -> dict[str, object]:
+        """Rename the device in BlueZ and read the new name back."""
+        with self._lock:
+            self._require_running()
+            address = self.address
+            if not address:
+                raise RuntimeError("no device selected")
+            stored = set_device_alias(address, name)
+            if self._status is not None:
+                self._status = replace(
+                    self._status,
+                    device=replace(self._status.device, alias=stored))
+            self._generation += 1
+            return {"name": stored}
 
     def snapshot(self) -> ControllerSnapshot:
         with self._lock:

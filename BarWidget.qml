@@ -46,6 +46,19 @@ BarWidget {
     ? snapshot.feature_switches : {}
   readonly property bool featureSwitchesAvailable: !!(snapshot && snapshot.capabilities
     && snapshot.capabilities.indexOf("feature_switches") !== -1)
+  // Local fork: the heading is the name the device carries, not a hard coded
+  // model name. BlueZ keeps the name the device reports and a separate alias
+  // that the user can rename.
+  readonly property string deviceName: {
+    var status = snapshot && snapshot.status
+    if (!status) return "OnePlus earbuds"
+    var alias = status.alias ? String(status.alias) : ""
+    if (alias) return alias
+    var name = status.name ? String(status.name) : ""
+    if (name) return name
+    return status.model ? String(status.model) : "OnePlus earbuds"
+  }
+  property bool editingName: false
   // Local fork: geometry probe for layout diagnostics.
   readonly property real popupX: popup.x
   readonly property real popupWidth: popup.width
@@ -257,11 +270,37 @@ BarWidget {
 
   function findEarbuds() {
     if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
-    var requestId = budsService.findEarbuds(!finding)
+    var ringing = !finding
+    var requestId = budsService.findEarbuds(ringing)
     if (requestId === null) { outcome = "Could not start request"; return }
+    finding = ringing
     pendingRequestId = requestId
     pendingKind = "find"
-    pendingMode = finding ? "stop" : "find"
+    pendingMode = ringing ? "find" : "stop"
+    outcome = ""
+  }
+
+  // Local fork: rename the device the way the phone app does.
+  function startRename() {
+    if (editingName) return
+    editingName = true
+    outcome = ""
+    Qt.callLater(function() { nameField.forceActiveFocus() })
+  }
+
+  function cancelRename() {
+    editingName = false
+  }
+
+  function saveDeviceName() {
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    var value = String(nameField.text || "").trim()
+    if (!value) { outcome = "The device name must not be empty"; return }
+    var requestId = budsService.request("set_device_name", { name: value })
+    if (requestId === null) { outcome = "Could not start request"; return }
+    pendingRequestId = requestId
+    pendingKind = "device_name"
+    pendingMode = value
     outcome = ""
   }
 
@@ -398,9 +437,12 @@ BarWidget {
       } else if (completedKind === "bass") {
         outcome = "Bass level sent"
       } else if (completedKind === "find") {
-        outcome = "Earbuds are ringing"
+        outcome = root.finding ? "Earbuds are ringing" : "Ringing stopped"
       } else if (completedKind === "feature") {
         outcome = "Switch updated"
+      } else if (completedKind === "device_name") {
+        editingName = false
+        outcome = "Device renamed"
       } else {
         outcome = ""
       }
@@ -527,16 +569,68 @@ BarWidget {
         width: panelScroll.width - (panelScrollBar.visible ? panelScrollBar.width : 0)
         spacing: Style.space(12)
 
-        Text {
+        // Local fork: the heading is the name the device carries, and it can
+        // be renamed in place with the pencil, the way the phone app does.
+        Row {
+          id: headingRow
           width: parent.width
-          textFormat: Text.PlainText
-          text: root.snapshot && root.snapshot.status && root.snapshot.status.model
-            ? String(root.snapshot.status.model) : "OnePlus earbuds"
-          color: root.bar.foreground
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.subtitle
-          font.bold: true
-          wrapMode: Text.Wrap
+          spacing: Style.space(8)
+
+          Text {
+            id: headingText
+            width: parent.width - Style.space(36)
+            textFormat: Text.PlainText
+            text: root.deviceName
+            color: root.bar.foreground
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.subtitle
+            font.bold: true
+            wrapMode: Text.Wrap
+            visible: !root.editingName
+            elide: Text.ElideRight
+          }
+
+          Controls.TextField {
+            id: nameField
+            width: parent.width - Style.space(36)
+            visible: root.editingName
+            text: root.deviceName
+            selectByMouse: true
+            onAccepted: root.saveDeviceName()
+            Keys.onEscapePressed: root.cancelRename()
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.subtitle
+          }
+
+          Button {
+            width: Style.space(28)
+            height: Style.space(28)
+            visible: !root.editingName
+            text: "✎"
+            bordered: false
+            enabled: root.connection !== "unavailable"
+            opacity: enabled ? 1.0 : 0.5
+            foreground: root.bar.foreground
+            background: root.bar.background
+            accent: Color.accent
+            fontFamily: root.bar.fontFamily
+            onClicked: root.startRename()
+          }
+
+          Button {
+            width: Style.space(28)
+            height: Style.space(28)
+            visible: root.editingName
+            text: "✓"
+            bordered: false
+            enabled: root.pendingRequestId < 0
+            opacity: enabled ? 1.0 : 0.5
+            foreground: root.bar.foreground
+            background: root.bar.background
+            accent: Color.accent
+            fontFamily: root.bar.fontFamily
+            onClicked: root.saveDeviceName()
+          }
         }
 
         Text {

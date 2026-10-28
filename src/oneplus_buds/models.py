@@ -20,6 +20,7 @@ class StatusResult:
     def to_dict(self) -> dict[str, object]:
         return {
             "name": self.device.name,
+            "alias": self.device.alias,
             "connected": self.device.connected,
             "compatible": self.device.looks_compatible,
             "bluez_battery": self.device.battery,
