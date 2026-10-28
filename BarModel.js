@@ -82,7 +82,7 @@ function ancGroups(snapshot) {
     if (["off", "transparency", "on"].indexOf(option.value) !== -1) {
       groups[0].options.push({value: option.value,
         label: option.value === "on" ? "Noise cancellation" : option.label})
-    } else if (["light", "medium", "deep", "smart"].indexOf(option.value) !== -1) {
+    } else if (["light", "medium", "deep", "smart", "auto"].indexOf(option.value) !== -1) {
       groups[1].options.push(option)
     } else {
       groups[2].options.push(option)

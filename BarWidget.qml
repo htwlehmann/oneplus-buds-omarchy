@@ -117,35 +117,22 @@ BarWidget {
       syncCustomSlotFromEq()
       collapseTimer.stop()
       if (bar) bar.hideTooltip(root)
-      if (budsService && connection === "connected" && snapshot
-          && snapshot.capabilities && snapshot.capabilities.indexOf("eq") !== -1
-          && pendingRequestId < 0) {
-        var requestId = budsService.eqStatus()
-        if (requestId !== null) {
-          pendingRequestId = requestId
-          pendingKind = "eq_status"
-        }
-      }
       // Local fork: load the feature switches and the bass engine level that
-      // the phone app shows, so the panel starts with the real state.
-      if (budsService && connection === "connected" && pendingRequestId < 0) {
+      // the phone app shows, so the panel starts with the real state. The
+      // requests are queued because the bridge handles one command at a time.
+      if (budsService && connection === "connected") {
+        panelQueue = []
         if (snapshot && snapshot.capabilities
-            && snapshot.capabilities.indexOf("feature_switches") !== -1) {
-          var switchesRequest = budsService.request("feature_switches", {})
-          if (switchesRequest !== null) {
-            pendingRequestId = switchesRequest
-            pendingKind = "feature_switches"
-          }
-        }
+            && snapshot.capabilities.indexOf("eq") !== -1)
+          panelQueue.push({ kind: "eq_status", command: "eq_status", params: {} })
         if (snapshot && snapshot.capabilities
-            && snapshot.capabilities.indexOf("bass_engine") !== -1
-            && pendingRequestId < 0) {
-          var bassRequest = budsService.request("bass_status", {})
-          if (bassRequest !== null) {
-            pendingRequestId = bassRequest
-            pendingKind = "bass_status"
-          }
-        }
+            && snapshot.capabilities.indexOf("feature_switches") !== -1)
+          panelQueue.push({ kind: "feature_switches", command: "feature_switches",
+            params: {} })
+        if (snapshot && snapshot.capabilities
+            && snapshot.capabilities.indexOf("bass_engine") !== -1)
+          panelQueue.push({ kind: "bass_status", command: "bass_status", params: {} })
+        sendNextPanelRequest()
       }
     } else if (!hitArea.containsMouse) {
       collapseTimer.restart()
@@ -153,6 +140,20 @@ BarWidget {
   }
 
   function close() { popupOpen = false }
+
+  // Local fork: the panel loads its state with a small request queue, because
+  // the bridge answers one command at a time.
+  property var panelQueue: []
+
+  function sendNextPanelRequest() {
+    if (!budsService || connection !== "connected") return
+    if (pendingRequestId >= 0 || panelQueue.length === 0) return
+    var entry = panelQueue.shift()
+    var requestId = budsService.request(entry.command, entry.params)
+    if (requestId === null) return
+    pendingRequestId = requestId
+    pendingKind = entry.kind
+  }
 
   function selectAnc(mode) {
     if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
@@ -316,6 +317,8 @@ BarWidget {
     pendingMode = ""
     var completedKind = pendingKind
     pendingKind = ""
+    // Local fork: continue the startup queue (feature switches, bass level).
+    sendNextPanelRequest()
     if (completedKind === "diagnostic_report") {
       if (response.ok === true) {
         reportSaved = true
@@ -338,16 +341,18 @@ BarWidget {
       customSelectionDirty = false
       syncCustomSlotFromEq()
     }
-    if (response.ok === true && response.result && response.result.verified === true) {
-      outcome = "Verified on earbuds"
-    } else if (response.ok === true && completedKind === "eq_status") {
-      outcome = ""
-    } else if (response.ok === true && completedKind === "bass") {
-      outcome = "Bass level sent"
-    } else if (response.ok === true && completedKind === "find") {
-      outcome = "Earbuds are ringing"
-    } else if (response.ok === true && completedKind === "feature") {
-      outcome = "Switch updated"
+    if (response.ok === true) {
+      if (response.result && response.result.verified === true) {
+        outcome = "Verified on earbuds"
+      } else if (completedKind === "bass") {
+        outcome = "Bass level sent"
+      } else if (completedKind === "find") {
+        outcome = "Earbuds are ringing"
+      } else if (completedKind === "feature") {
+        outcome = "Switch updated"
+      } else {
+        outcome = ""
+      }
     } else {
       var detail = response.error && response.error.message
         ? String(response.error.message) : "Change could not be verified"
@@ -581,7 +586,7 @@ BarWidget {
                 model: root.eqPresets
                 delegate: Button {
                   required property var modelData
-                  width: modelData.name.length > 22 ? eqPresetFlow.width
+                  width: modelData.name.length > 16 ? eqPresetFlow.width
                     : (eqPresetFlow.width - eqPresetFlow.spacing) / 2
                   height: Math.max(implicitHeight, Style.space(32))
                   text: modelData.name
@@ -613,7 +618,7 @@ BarWidget {
                 spacing: Style.space(8)
 
                 Text {
-                  width: parent.width - Style.space(44)
+                  width: parent.width - Style.space(56)
                   text: "BassWave"
                   textFormat: Text.PlainText
                   color: root.bar.foreground
@@ -623,6 +628,7 @@ BarWidget {
                 }
 
                 ToggleSwitch {
+                  width: Style.space(40)
                   checked: root.bassEngineEnabled
                   busy: root.pendingRequestId >= 0
                   enabled: root.connection === "connected" && root.pendingRequestId < 0
@@ -769,7 +775,7 @@ BarWidget {
                 spacing: Style.space(8)
 
                 Text {
-                  width: parent.width - Style.space(44)
+                  width: parent.width - Style.space(56)
                   text: modelData.label
                   textFormat: Text.PlainText
                   color: root.bar.foreground
@@ -779,6 +785,7 @@ BarWidget {
                 }
 
                 ToggleSwitch {
+                  width: Style.space(40)
                   checked: modelData.enabled
                   busy: root.pendingRequestId >= 0
                   enabled: root.connection === "connected" && root.pendingRequestId < 0
@@ -1011,6 +1018,11 @@ BarWidget {
 
     function diagPing(): string {
       return root.diagPing()
+    }
+
+    function open(): string {
+      root.popupOpen = true
+      return "ok"
     }
 
     function diagnostic(payload: string): string {
