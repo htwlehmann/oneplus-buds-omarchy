@@ -12,6 +12,7 @@ from .controller import BudsController
 from .timing import AncRequestError
 from .models import ControllerSnapshot, ControlResult, EqControlResult
 from .profiles import compatibility_for_product, profile_for_product
+from .protocol import FEATURE_SWITCH_NAMES
 from .report import build_snapshot_report, write_report
 from .service import BudsServiceRunner, ServiceState
 
@@ -19,6 +20,9 @@ JsonObject: TypeAlias = dict[str, object]
 Dispatch: TypeAlias = Callable[[Callable[[], None]], None]
 
 SCHEMA_VERSION = 1
+
+# Reverse lookup for the feature switch names exposed to frontends.
+FEATURE_SWITCH_IDS = {name: feature_id for feature_id, name in FEATURE_SWITCH_NAMES.items()}
 
 
 def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
@@ -149,6 +153,62 @@ class BudsFrontendBridge:
                 )
                 filename = write_report(report, path)
                 result = {"saved": True, "filename": filename}
+            elif command == "diagnostic_query":
+                # Local fork: read-only raw query for capability discovery.
+                self._require_parameters(command, params, {"command", "payload", "wait"})
+                raw_command = params["command"]
+                if not isinstance(raw_command, int) or isinstance(raw_command, bool):
+                    raise ValueError(
+                        "diagnostic_query parameter 'command' must be an integer"
+                    )
+                payload_hex = params.get("payload", "")
+                if not isinstance(payload_hex, str):
+                    raise ValueError(
+                        "diagnostic_query parameter 'payload' must be a hex string"
+                    )
+                try:
+                    payload = bytes.fromhex(payload_hex.replace(" ", ""))
+                except ValueError as error:
+                    raise ValueError(
+                        "diagnostic_query parameter 'payload' must be a hex string"
+                    ) from error
+                wait = params.get("wait", 0.5)
+                if not isinstance(wait, (int, float)) or isinstance(wait, bool):
+                    raise ValueError(
+                        "diagnostic_query parameter 'wait' must be a number"
+                    )
+                result = {
+                    "frames": self.controller.diagnostic_query(
+                        raw_command, payload, float(wait))
+                }
+            elif command == "feature_switches":
+                # Local fork: read the device feature switches.
+                result = {"feature_switches": self.controller.feature_switches()}
+            elif command == "set_feature_switch":
+                # Local fork: write one feature switch.
+                self._require_parameters(command, params, {"feature", "enabled"})
+                feature = params["feature"]
+                enabled = params["enabled"]
+                if isinstance(feature, str):
+                    feature = FEATURE_SWITCH_IDS.get(feature)
+                if not isinstance(feature, int) or isinstance(feature, bool):
+                    raise ValueError(
+                        "set_feature_switch parameter 'feature' must be a known feature"
+                    )
+                if not isinstance(enabled, bool):
+                    raise ValueError(
+                        "set_feature_switch parameter 'enabled' must be a boolean"
+                    )
+                result = self.controller.set_feature_switch(feature, enabled)
+            elif command == "find_earbuds":
+                # Local fork: ring the earbuds to locate them.
+                self._require_parameters(command, params, {"ringing"})
+                ringing = params["ringing"]
+                if not isinstance(ringing, bool):
+                    raise ValueError(
+                        "find_earbuds parameter 'ringing' must be a boolean"
+                    )
+                result = self.controller.find_earbuds(ringing)
             else:
                 return self._response(
                     command,

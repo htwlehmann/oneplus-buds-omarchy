@@ -24,10 +24,15 @@ from .protocol import (
     QUERY_ANC,
     QUERY_EQ,
     QUERY_EQ_ALL,
+    QUERY_STATUS,
     SET_ANC,
     SET_EQ,
     SET_EQ_DETAIL,
+    SET_FEATURE_SWITCH,
+    SET_FIND_MODE,
     RESPONSE_SET_ANC,
+    RESPONSE_SET_FEATURE_SWITCH,
+    RESPONSE_SET_FIND_MODE,
     REGISTER,
     RESPONSE_ANC,
     RESPONSE_EQ,
@@ -432,6 +437,75 @@ class OpoSession:
         return EventBatch(
             setup.events + received.events,
             setup.ignored_frames + received.ignored_frames,
+        )
+
+    def feature_switches(self, feature_ids: tuple[int, ...]) -> dict[int, bool]:
+        """Read the device's feature switches.
+
+        The request carries a count byte followed by the wanted feature ids,
+        which is the shape the phone app uses. Unsupported ids come back as
+        zero bytes.
+        """
+        self._require_connected()
+        payload = bytes((len(feature_ids),)) + bytes(feature_ids)
+        frame = self._transport.request(
+            QUERY_STATUS, payload, RESPONSE_STATUS,
+        )
+        switches = parse_feature_switches(frame)
+        if switches is None:
+            raise RuntimeError("device returned malformed feature switch state")
+        return switches
+
+    def set_feature_switch(self, feature_id: int, enabled: bool) -> tuple[int | None, bool]:
+        """Set one feature switch and verify it with a fresh read."""
+        self._require_connected()
+        if not 0 <= feature_id <= 0xFF:
+            raise ValueError("feature id must fit in one byte")
+        payload = bytes((feature_id, 1 if enabled else 0))
+        try:
+            acknowledgement = self._transport.request(
+                SET_FEATURE_SWITCH, payload, RESPONSE_SET_FEATURE_SWITCH,
+            )
+            status = parse_set_anc_status(acknowledgement)
+        except TimeoutError:
+            status = None
+        verified = self.feature_switches((feature_id,)).get(feature_id)
+        return status, bool(verified) == bool(enabled)
+
+    def find_earbuds(self, ringing: bool = True) -> tuple[int | None, bool]:
+        """Start or stop the find-my-earbuds tone."""
+        self._require_connected()
+        payload = bytes((1 if ringing else 0,))
+        try:
+            acknowledgement = self._transport.request(
+                SET_FIND_MODE, payload, RESPONSE_SET_FIND_MODE,
+            )
+            status = parse_set_anc_status(acknowledgement)
+        except TimeoutError:
+            status = None
+        return status, True
+
+    def diagnostic_query(self, command: int, payload: bytes = b"",
+                        wait: float = 0.5) -> tuple[dict[str, object], ...]:
+        """Local fork: read-only raw query used to discover device capabilities.
+
+        Only query command classes are allowed. Write commands are refused so
+        the probe can never change the earbuds' state by accident.
+        """
+        self._require_connected()
+        if not 0x0100 <= command <= 0x02FF:
+            raise ValueError(
+                "diagnostic queries are limited to the 0x0100-0x02ff command range"
+            )
+        frames = self._transport.query(command, payload, wait=wait)
+        return tuple(
+            {
+                "command": frame.command,
+                "command_hex": f"0x{frame.command:04x}",
+                "sequence": frame.sequence,
+                "payload": frame.payload.hex(" "),
+            }
+            for frame in frames
         )
 
     def _redact(self, frames: list[Frame]) -> EventBatch:

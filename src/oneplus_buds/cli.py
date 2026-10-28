@@ -4,7 +4,7 @@ import argparse
 import json
 
 from .backend import (device_summary, diagnostics_report, query_capabilities, query_eq,
-                      query_status, set_anc, set_custom_eq, set_eq)
+                      query_status, read_raw_query, set_anc, set_custom_eq, set_eq)
 from .bluez import connected_devices
 
 
@@ -31,6 +31,15 @@ def main() -> None:
     eq_custom = eq_commands.add_parser("custom", help="update an existing device-declared custom curve")
     eq_custom.add_argument("entry_id", type=int, help="custom entry id returned by eq status")
     eq_custom.add_argument("gains", nargs="+", type=int, help="one whole-dB gain per reported band")
+    raw_parser = subparsers.add_parser(
+        "raw", help="read-only raw protocol query (capability discovery)"
+    )
+    raw_parser.add_argument("command", type=lambda v: int(v, 0),
+                            help="command id, for example 0x010d")
+    raw_parser.add_argument("payload", nargs="?", default="",
+                            help="optional hex payload")
+    raw_parser.add_argument("--wait", type=float, default=0.5,
+                            help="seconds to wait for the answer")
     args = parser.parse_args()
     try:
         if args.command == "devices":
@@ -45,6 +54,8 @@ def main() -> None:
             output = query_capabilities(args.device)
         elif args.command == "diagnostics":
             output = diagnostics_report(args.device)
+        elif args.command == "raw":
+            output = read_raw_query(args.command, args.payload, args.wait, args.device)
         elif args.command == "eq":
             if args.eq_command == "status":
                 output = query_eq(args.device)

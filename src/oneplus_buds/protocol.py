@@ -19,9 +19,13 @@ QUERY_EQ_ALL = 0x0122
 SET_ANC = 0x0404
 SET_EQ = 0x0406
 SET_EQ_DETAIL = 0x0418
+SET_FIND_MODE = 0x0400
+SET_FEATURE_SWITCH = 0x0403
 RESPONSE_SET_ANC = 0x8404
 RESPONSE_SET_EQ = 0x8406
 RESPONSE_SET_EQ_DETAIL = 0x8418
+RESPONSE_SET_FEATURE_SWITCH = 0x8403
+RESPONSE_SET_FIND_MODE = 0x8400
 
 RESPONSE_PRODUCT_ID = 0x8103
 RESPONSE_REMOTE_VERSION = 0x8105
@@ -37,10 +41,24 @@ RESPONSE_BROADCAST_CODES = 0x8200
 FEATURE_SWITCH_NAMES = {
     0x04: "wear_detection",
     0x06: "low_latency",
+    0x09: "vocal_enhance",
     0x0B: "hearing_enhancement",
+    0x0C: "personal_noise",
+    0x0D: "click_to_take_photo",
+    0x15: "zen_mode",
     0x11: "multipoint",
     0x18: "high_quality_audio",
+    0x1B: "spatial_sound",
+    0x1D: "bass_engine",
+    0x21: "game_equalizer",
+    0x28: "game_mode_main",
 }
+
+# The app asks for feature switches with a count byte followed by the wanted
+# feature ids. The device answers with the same shape for the ids it knows
+# and pads the rest with zeros.
+FEATURE_SWITCH_QUERY_PREFIX = bytes((1,))
+FEATURE_SWITCH_WRITE = bytes((1,))
 
 # Authentication frames have a legacy envelope that is not representable by
 # encode_frame: HELLO carries a trailing 0x12 beyond its zero inner length.

@@ -234,6 +234,18 @@ def set_anc(mode: str, address: str | None = None) -> dict[str, object]:
     return write_anc(mode, address).to_dict()
 
 
+def read_raw_query(command: int, payload: str = "", wait: float = 0.5,
+                   address: str | None = None) -> dict[str, object]:
+    """Local fork: read-only raw query for capability discovery."""
+    device = select_device(address)
+    session, _status, _events = OpoSession.bootstrap(device)
+    try:
+        frames = session.diagnostic_query(command, bytes.fromhex(payload.replace(" ", "")), wait)
+        return {"command": f"0x{command:04x}", "frames": list(frames)}
+    finally:
+        session.__exit__(None, None, None)
+
+
 def read_eq(address: str | None = None) -> EqStatusResult:
     device = select_device(address)
     session, _status, _events = OpoSession.bootstrap(device)

@@ -8,7 +8,7 @@ from .lifecycle_trace import mark
 from .api import BudsBackend
 from .models import ControllerSnapshot, ControlResult, EqControlResult, EqStatusResult, EventBatch, StatusResult
 from .profiles import profile_for_product
-from .protocol import VersionRecord
+from .protocol import FEATURE_SWITCH_NAMES, VersionRecord
 from .session import OpoSession, UnsupportedProductError
 from .timing import AncRequestError, PhaseTimer
 
@@ -167,6 +167,15 @@ class BudsController:
             self._generation += 1
             return result
 
+    def diagnostic_query(self, command: int, payload: bytes = b"",
+                        wait: float = 0.5) -> tuple[dict[str, object], ...]:
+        """Local fork: read-only raw query for capability discovery."""
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            return cast(OpoSession, self._session).diagnostic_query(command, payload, wait)
+
     def set_eq(self, preset: str) -> EqControlResult:
         with self._lock:
             self._require_running()
@@ -236,6 +245,53 @@ class BudsController:
             self._eq_status = None
             self._generation += 1
             return self.snapshot()
+
+    def feature_switches(self) -> dict[str, bool]:
+        """Read the device's feature switches through the phone app's shape."""
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            switches = cast(OpoSession, self._session).feature_switches(
+                tuple(FEATURE_SWITCH_NAMES))
+            named = {
+                name: switches[feature_id]
+                for feature_id, name in FEATURE_SWITCH_NAMES.items()
+                if feature_id in switches
+            }
+            self._feature_switches.update(named)
+            self._generation += 1
+            return named
+
+    def set_feature_switch(self, feature_id: int, enabled: bool) -> dict[str, object]:
+        """Set one feature switch and verify it with a fresh read."""
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            status, verified = cast(OpoSession, self._session).set_feature_switch(
+                feature_id, enabled)
+            name = FEATURE_SWITCH_NAMES.get(feature_id, f"feature_{feature_id:02x}")
+            if verified:
+                self._feature_switches[name] = enabled
+            self._generation += 1
+            return {
+                "feature": name,
+                "feature_id": feature_id,
+                "enabled": enabled,
+                "verified": verified,
+                "set_status": status,
+            }
+
+    def find_earbuds(self, ringing: bool = True) -> dict[str, object]:
+        """Start or stop the find-my-earbuds tone."""
+        with self._lock:
+            self._require_running()
+            if self._session is None:
+                self.refresh()
+            status, sent = cast(OpoSession, self._session).find_earbuds(ringing)
+            self._generation += 1
+            return {"ringing": ringing, "sent": sent, "set_status": status}
 
     def snapshot(self) -> ControllerSnapshot:
         with self._lock:
