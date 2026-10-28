@@ -846,8 +846,7 @@ BarWidget {
 
             Column {
               objectName: "customEqSection"
-              x: Style.space(8)
-              width: parent.width - x
+              width: parent.width
               spacing: Style.space(5)
               visible: root.customEqEntries.length > 0
 

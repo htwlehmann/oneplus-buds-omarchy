@@ -198,7 +198,7 @@ choices. Unsaved changes survive ordinary snapshot updates and folding;
 failed verification restores the actual readback. Invalid read masks (including
 fewer than two bits), malformed ACKs and lost readbacks invalidate the state.
 
-Custom EQ is a lightly indented subsection under Earbud EQ, after presets and
+Custom EQ is a full-width subsection under Earbud EQ, after presets and
 before BassWave. Both disclosures start closed every time the panel opens.
 
 ## Comparison with the upstream reference models
