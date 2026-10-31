@@ -79,6 +79,34 @@ using the SHA-256 of the app's signing certificate. Decrypted, the entry for
 `064414` lists exactly these indices, including Auto at index 7, and the
 plugin's independent measurements match it entry for entry.
 
+### English ANC label recheck (2026-10-31)
+
+The current labels **Low, Moderate, High, Auto** match the English resources
+actually selected for064414 in Wireless Earphones17.6.6. No UI change is needed.
+The whitelist pairs protocol indices6/5/4/7 with mode types3/8/4/7;
+`wa.i.b(Context,Integer)` selects these resource keys:
+
+| Internal key | App mode type | Resource | English label |
+|---|---:|---|---|
+| light |3| melody_common_lite_noise_reduction_title | Low |
+| medium |8| melody_common_middle_noise_reduction_title | Moderate |
+| deep |4| melody_common_depth_noise_reduction_title | High |
+| auto |7| melody_common_intelligent_noise_reduction_title_v2 | Auto |
+
+The APK also contains Smart in legacy/other UI contexts and Adaptive for a
+separate mode type10. Neither replaces the Nord strength label Auto in this
+selector. Light/Medium/Deep remain internal/plugin fallback names. The source
+mapping is used by `wa.m` (NoiseReductionSelectItem); no wire payloads changed.
+
+REA: `ev_d34f0396c6c326955330c626991544f95627e4453ce140bfa99a4bb65e2b32db`
+(resource selection) and
+`ev_120e3e24782b9308900f565e67f928c16f7f882650ee5d08ace63abadaae1203`
+(protocol-index to model-mode-type lookup). Export and machine comparison in
+research folder: `rea-anc-english-labels-2026-10-31-evidence.json` and
+`anc-english-labels-2026-10-31.json`. The comparison also executed the real
+BarModel.ancGroups with current profile data and confirmed all four UI labels.
+APK SHA256 remains ed75c8f4ad06ebdb2100477b6db75c49931c2514127f390b259b6bff8c768641.
+
 ### ANC latency correction (2026-10-31)
 
 The controller accidentally restricted session reuse to On/Off/Transparency.
