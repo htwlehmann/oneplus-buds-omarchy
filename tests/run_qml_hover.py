@@ -16,7 +16,7 @@ if not Path(runner).exists():
 with tempfile.TemporaryDirectory(prefix="oneplus-hover-") as directory:
     staging = Path(directory)
     shutil.copytree(root / "tests/qml", staging, dirs_exist_ok=True)
-    for name in ("BarWidget.qml", "BarModel.js"):
+    for name in ("BarWidget.qml", "BarModel.js", "EqCurveEditor.qml", "EqCurve.js"):
         shutil.copy(root / name, staging / name)
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QPA_PLATFORMTHEME="",
                QT_QUICK_CONTROLS_STYLE="Basic", QT_LOGGING_TO_CONSOLE="1",

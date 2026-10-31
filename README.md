@@ -136,6 +136,13 @@ from your ears before starting (also noted in the Play button tooltip). Search c
 the device acknowledgement; an unconfirmed result keeps Stop available. The
 plugin attempts to stop after50seconds and when its panel closes.
 
+Custom EQ opens a curve editor with draggable band points. Values snap to the
+device's dB steps; releasing a changed point saves the complete curve and checks
+it against the earbuds. Up/Down also adjusts a focused point and saves on key
+release. Selecting a saved custom curve activates it. The graph uses the current
+Omarchy accent and a fill fading to transparent. Editing is disabled during a
+save, when disconnected, or when the model does not support custom-EQ writes.
+
 Wear the earbuds for ANC tests: devices in their case may reject changes. Main
 ANC On may choose a device-dependent strength; select a specific strength if you
 need one. Cold setup still takes several seconds. Warm mode and strength changes

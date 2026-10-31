@@ -13,6 +13,7 @@ TestCase {
   property int nextId: 1
   property int eqStatusCalls: 0
   property var customRequest: null
+  property var customRequests: []
   property int reportRequests: 0
   property string reportPath: ""
   property var touchRequest: null
@@ -43,8 +44,9 @@ TestCase {
   }
   function eqStatus() { eqStatusCalls++; return nextId++ }
   function setEq(value) { return nextId++ }
-  function setCustomEq(entryId, gains) {
-   customRequest = ({entry_id: entryId, gains: gains}); return nextId++
+  function setCustomEq(entryId, gains, deviceId) {
+   customRequest = ({entry_id: entryId, gains: gains, device_id:deviceId || ""})
+   customRequests = customRequests.concat([customRequest]); return nextId++
   }
   function saveDiagnosticReport(path) { reportRequests++; reportPath = path; return nextId++ }
  }
@@ -85,6 +87,7 @@ TestCase {
   service.lastResponse = null
   service.eqStatusCalls = 0
   service.customRequest = null
+  service.customRequests = []
   service.reportRequests = 0
   service.reportPath = ""
   service.touchRequest = null
@@ -489,14 +492,16 @@ TestCase {
   verify(!touch.visible)
   tryVerify(function() { return widget.panelHeight > compactHeight })
   compare(widget.contentWidth, fixedWidth)
-  var gain = findChild(widget, "customEqGain_62")
-  gain.value = 5
+  var gain = findChild(widget, "eqHandle_62")
   gain.forceActiveFocus()
   verify(gain.activeFocus)
+  keyPress(Qt.Key_Up)
+  compare(bands.gains[0],4)
   customHeader.clicked()
   wait(0)
   verify(!bands.visible)
   verify(!gain.activeFocus)
+  keyRelease(Qt.Key_Up)
   tryCompare(widget, "panelHeight", compactHeight)
   touchHeader.clicked()
   wait(0)
@@ -509,7 +514,7 @@ TestCase {
   verify(!touch.activeFocus)
   customHeader.clicked()
   wait(0)
-  compare(gain.value, 5)
+  compare(bands.gains[0],3) // Collapsing an unfinished gesture cancels it.
   compare(service.customRequest, null)
   compare(service.touchRequest, null)
   touchHeader.clicked()
@@ -557,12 +562,54 @@ TestCase {
   service.snapshot = JSON.parse(JSON.stringify(service.snapshot))
   wait(0)
   compare(widget.selectedCustom.eq_id, 5)
-  widget.applyCustomEq()
+  widget.customEqExpanded = true
+  var curve = findChild(widget,"customEqBands")
+  var handle = findChild(widget,"eqHandle_62")
+  handle.forceActiveFocus()
+  keyPress(Qt.Key_Up)
+  compare(service.customRequest,null)
+  keyRelease(Qt.Key_Up)
   verify(service.customRequest !== null)
   compare(service.customRequest.entry_id, 5)
-  compare(service.customRequest.gains.join(","), "0,0")
+  compare(service.customRequest.gains.join(","), "1,0")
+  widget.pendingRequestId = -1
+  service.customRequest = null
+  widget.activateCustomSlot(0)
+  compare(service.customRequest,null) // The current curve needs no activation write.
+  widget.activateCustomSlot(1)
+  compare(service.customRequest.entry_id,5)
+  compare(service.customRequest.gains.join(","),"0,0")
   widget.pendingRequestId = -1
   widget.popupOpen = false
+ }
+ function test_curve_autosave_uses_pair_token_and_settles_failed_save_from_readback() {
+  var state = findSnapshot("stopped")
+  state.capabilities = ["eq"]
+  state.custom_eq_write_verified = true
+  state.eq = {current_id:7,current_name:"Curve",gain_step_db:1,presets:[],
+   custom_entries:[{eq_id:7,name:"Curve",min_gain_db:-6,max_gain_db:6,
+    bands:[{frequency_hz:62,gain_db:3},{frequency_hz:250,gain_db:1}]}]}
+  service.snapshot=state
+  widget.popupOpen=true
+  service.lastResponse={request_id:widget.pendingRequestId,ok:true,result:{}}
+  widget.customEqExpanded=true
+  var curve=findChild(widget,"customEqBands")
+  var handle=findChild(widget,"eqHandle_62")
+  handle.forceActiveFocus()
+  keyPress(Qt.Key_Up)
+  compare(curve.gains[0],4)
+  service.snapshot=JSON.parse(JSON.stringify(state))
+  compare(curve.gains[0],4) // Polling must not reset a local gesture.
+  keyRelease(Qt.Key_Up)
+  compare(service.customRequests.length,1)
+  compare(service.customRequest.device_id,state.find_device_id)
+  compare(service.customRequest.gains.join(","),"4,1")
+  verify(!curve.enabled)
+  service.lastResponse={request_id:widget.pendingRequestId,ok:true,result:{verified:false}}
+  wait(0)
+  compare(curve.gains[0],3)
+  verify(widget.outcome.indexOf("not confirmed")!==-1)
+  verify(curve.enabled)
  }
  function test_panel_falls_back_when_width_is_narrow() {
   service.snapshot = ({status:{model:"Test buds",battery:{}}, anc_modes:["off","on"],

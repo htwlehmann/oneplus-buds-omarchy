@@ -145,7 +145,9 @@ class BudsFrontendBridge:
                 result = self._serialize_eq_control(control)
                 self._on_snapshot(self.controller.snapshot())
             elif command == "set_custom_eq":
-                self._require_parameters(command, params, {"entry_id", "gains_db"})
+                self._require_parameters(command, params,
+                    {"entry_id", "gains_db", "device_id"} if "device_id" in params
+                    else {"entry_id", "gains_db"})
                 entry_id, gains = params["entry_id"], params["gains_db"]
                 if not isinstance(entry_id, int) or isinstance(entry_id, bool):
                     raise ValueError("set_custom_eq parameter 'entry_id' must be an integer")
@@ -153,7 +155,12 @@ class BudsFrontendBridge:
                     not isinstance(value, int) or isinstance(value, bool) for value in gains
                 ):
                     raise ValueError("set_custom_eq parameter 'gains_db' must be an integer array")
-                control = self.controller.set_custom_eq(entry_id, tuple(gains))
+                device_id = params.get("device_id")
+                if "device_id" in params and (not isinstance(device_id, str)
+                        or re.fullmatch(r"[0-9a-f]{64}", device_id) is None):
+                    raise ValueError("set_custom_eq device_id must be a snapshot device token")
+                control = self.controller.set_custom_eq(entry_id, tuple(gains),
+                    **({"device_id": device_id} if device_id is not None else {}))
                 self.controller.eq_status()
                 result = self._serialize_eq_control(control)
                 self._on_snapshot(self.controller.snapshot())

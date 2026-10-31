@@ -403,3 +403,22 @@ supported model. For `064414` it agrees with every measurement taken here.
 - Case battery behaviour with the case deliberately opened and closed
 - Whether the seven EQ factory slots keep their names across firmware updates
 - Repeated-operation timing across firmware revisions and longer stress runs
+
+
+## Custom EQ curve editor (2026-10-31)
+
+Custom EQ now shows the six device bands as draggable points and a smooth
+bounded curve. Range and step come from the device entry (Nord-6..+6dB,1dB).
+The shell accent controls stroke, point borders, numbers and the filled area,
+which fades down to transparent. No new audio filter or wire mapping is used.
+
+Changed release saves once, then the backend independently verifies the curve;
+there are no writes while dragging. Up/Down supports the focused point. Selecting
+an existing custom slot activates it without an Apply button. Pending saves
+block interaction. Failed/unconfirmed responses settle from actual device state.
+Cancelling a gesture or changing device/slot does not save.
+
+A native pointer test changed62Hz4->5->4 with ACK00 and verified readback.
+An independent query during each held drag showed the previous62Hz value.
+The original full curve and entry7 were restored after the test. See
+[measurement](../measurements/2026-10-31-nord-eq-curve.json).

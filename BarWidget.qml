@@ -82,7 +82,7 @@ BarWidget {
   readonly property real contentWidth: popup.contentWidth
   readonly property real controlSectionsWidth: controlSections.width
   readonly property real eqColumnWidth: eqColumn.width
-  readonly property real bandFlowWidth: customBandFlow.width
+  readonly property real bandFlowWidth: customCurve.width
   readonly property real scrollbarWidth: panelScroll.ScrollBar.vertical
     ? panelScroll.ScrollBar.vertical.width : 0
   readonly property bool scrollbarVisible: !!(panelScroll.ScrollBar.vertical
@@ -115,6 +115,7 @@ BarWidget {
   // be answered, so the panel must not stay disabled.
   onConnectionChanged: {
     if (connection !== "connected" && pendingRequestId >= 0) {
+      if (pendingKind === "custom_eq") customCurve.settle()
       pendingRequestId = -1
       pendingKind = ""
       pendingMode = ""
@@ -142,6 +143,8 @@ BarWidget {
   property string pendingKind: ""
   property int customSlotIndex: 0
   property bool customSelectionDirty: false
+  readonly property string customEqDeviceKey: snapshot && snapshot.find_device_id
+    ? String(snapshot.find_device_id) : ""
   property bool customEqExpanded: false
   property bool touchControlsExpanded: false
   property bool reportDetailsOpen: false
@@ -298,6 +301,7 @@ BarWidget {
   // Local fork: give up on a request that never gets an answer.
   function abandonPendingRequest() {
     if (pendingRequestId < 0) return
+    if (pendingKind === "custom_eq") customCurve.settle()
     pendingRequestId = -1
     pendingKind = ""
     pendingMode = ""
@@ -392,17 +396,30 @@ BarWidget {
     outcome = ""
   }
 
-  function applyCustomEq() {
-    if (!selectedCustom || !budsService || pendingRequestId >= 0) return
-    var gains = []
-    for (var i = 0; i < bandRepeater.count; i++)
-      gains.push(Number(bandRepeater.itemAt(i).gainValue))
-    var requestId = budsService.setCustomEq(selectedCustom.eq_id, gains)
-    if (requestId === null) { outcome = "Could not start request"; return }
+  function saveCustomEq(entryId, gains, deviceKey) {
+    if (!selectedCustom || selectedCustom.eq_id !== entryId || !customEqExpanded
+        || !budsService || connection !== "connected" || pendingRequestId >= 0
+        || !snapshot || snapshot.session_connected !== true
+        || snapshot.custom_eq_write_verified !== true || deviceKey !== customEqDeviceKey) return
+    var requestId = budsService.setCustomEq(entryId, gains.slice(), deviceKey)
+    if (requestId === null) {
+      outcome = "Could not start request"
+      customCurve.settle()
+      return
+    }
     pendingRequestId = requestId
     pendingKind = "custom_eq"
     pendingMode = selectedCustom.name
     outcome = ""
+    requestWatchdog.restart()
+  }
+
+  function activateCustomSlot(index) {
+    if (index < 0 || index >= customEqEntries.length) return
+    selectCustomSlot(index)
+    var entry = customEqEntries[index]
+    if (eqStatus && eqStatus.current_id !== entry.eq_id)
+      saveCustomEq(entry.eq_id, entry.bands.map(function(b) { return b.gain_db }), customEqDeviceKey)
   }
 
   function saveDiagnosticReport(fileUrl) {
@@ -521,8 +538,11 @@ BarWidget {
       customSelectionDirty = false
       syncCustomSlotFromEq()
     }
+    if (completedKind === "custom_eq") customCurve.settle()
     if (response.ok === true) {
-      if (completedKind === "hold_cycle" && (!response.result || response.result.verified !== true)) {
+      if (completedKind === "custom_eq" && (!response.result || response.result.verified !== true)) {
+        outcome = "EQ change was not confirmed by earbuds"
+      } else if (completedKind === "hold_cycle" && (!response.result || response.result.verified !== true)) {
         outcome = "Hold cycle was not confirmed by earbuds"
       } else if (completedKind === "touch_write" && (!response.result || response.result.verified !== true)) {
         outcome = "Touch assignment was not confirmed by earbuds"
@@ -909,69 +929,30 @@ BarWidget {
                 model: root.customEqEntries.map(function(entry) { return entry.name })
                 currentIndex: root.customSlotIndex
                 enabled: root.customEqExpanded && root.pendingRequestId < 0
-                onActivated: function(index) { root.selectCustomSlot(index) }
+                onActivated: function(index) { root.activateCustomSlot(index) }
               }
 
-              Flow {
-                id: customBandFlow
+              EqCurveEditor {
+                id: customCurve
                 objectName: "customEqBands"
                 width: parent.width
+                height: implicitHeight
                 visible: root.customEqExpanded && root.customEqEntries.length > 0
-                enabled: root.customEqExpanded
-                spacing: Style.space(5)
-
-                Repeater {
-                  id: bandRepeater
-                  model: root.selectedCustom ? root.selectedCustom.bands : []
-                  delegate: Column {
-                    required property var modelData
-                    property alias gainValue: gainBox.value
-                    width: (customBandFlow.width - customBandFlow.spacing) / 2
-                    spacing: Style.space(2)
-
-                    Text {
-                      width: parent.width
-                      text: modelData.frequency_hz >= 1000
-                        ? (modelData.frequency_hz / 1000) + " kHz" : modelData.frequency_hz + " Hz"
-                      color: root.bar.foreground
-                      font.family: root.bar.fontFamily
-                      font.pixelSize: Style.font.bodySmall
-                    }
-                    Controls.SpinBox {
-                      id: gainBox
-                      objectName: "customEqGain_" + modelData.frequency_hz
-                      width: parent.width
-                      from: root.selectedCustom ? root.selectedCustom.min_gain_db : -6
-                      to: root.selectedCustom ? root.selectedCustom.max_gain_db : 6
-                      stepSize: root.eqStatus && root.eqStatus.gain_step_db
-                        ? root.eqStatus.gain_step_db : 1
-                      value: modelData.gain_db
-                      editable: true
-                      enabled: root.snapshot && root.snapshot.custom_eq_write_verified === true
-                        && root.pendingRequestId < 0
-                      textFromValue: function(value) { return (value > 0 ? "+" : "") + value + " dB" }
-                      valueFromText: function(text) { return parseInt(text) || 0 }
-                    }
-                  }
+                enabled: root.customEqExpanded && root.connection === "connected"
+                  && root.snapshot && root.snapshot.session_connected === true
+                  && root.snapshot.custom_eq_write_verified === true && root.pendingRequestId < 0
+                entry: root.selectedCustom
+                contextKey: root.customEqDeviceKey
+                step: root.eqStatus && root.eqStatus.gain_step_db ? root.eqStatus.gain_step_db : 1
+                foreground: root.bar.foreground
+                background: root.bar.background
+                fontFamily: root.bar.fontFamily
+                onEditingStarted: root.customSelectionDirty = true
+                onReleased: function(entryId, values, deviceKey) {
+                  root.saveCustomEq(entryId, values, deviceKey)
                 }
               }
 
-              Button {
-                width: parent.width
-                height: Math.max(implicitHeight, Style.space(32))
-                visible: root.customEqExpanded && root.selectedCustom !== null
-                text: "Apply " + (root.selectedCustom ? root.selectedCustom.name : "custom EQ")
-                bordered: true
-                leftAlign: true
-                enabled: root.customEqExpanded && root.snapshot && root.snapshot.custom_eq_write_verified === true
-                  && root.pendingRequestId < 0
-                opacity: enabled ? 1.0 : 0.5
-                foreground: root.bar.foreground
-                background: root.bar.background
-                accent: Color.accent
-                fontFamily: root.bar.fontFamily
-                onClicked: root.applyCustomEq()
-              }
             }
 
             // Local fork: the phone app's BassWave control (feature switch

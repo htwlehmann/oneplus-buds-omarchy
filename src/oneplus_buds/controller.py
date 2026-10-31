@@ -214,11 +214,17 @@ class BudsController:
             self._generation += 1
             return result
 
-    def set_custom_eq(self, entry_id: int, gains_db: tuple[int, ...]) -> EqControlResult:
+    def set_custom_eq(self, entry_id: int, gains_db: tuple[int, ...], *,
+                      device_id: str | None = None) -> EqControlResult:
         with self._lock:
             self._require_running()
+            intended_key = self._find_key()
+            if device_id is not None and device_id != self._find_device_id():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
             if self._session is None:
                 self.refresh()
+            if intended_key is not None and intended_key != self._find_key():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
             try:
                 result, batch = cast(OpoSession, self._session).set_custom_eq(entry_id, gains_db)
             except ValueError:

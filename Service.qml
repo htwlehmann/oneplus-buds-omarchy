@@ -106,8 +106,10 @@ Item {
     return request("set_eq", { preset: String(preset || "") })
   }
 
-  function setCustomEq(entryId, gains) {
-    return request("set_custom_eq", { entry_id: Number(entryId), gains_db: gains })
+  function setCustomEq(entryId, gains, deviceId) {
+    var params = { entry_id: Number(entryId), gains_db: gains }
+    if (deviceId) params.device_id = String(deviceId)
+    return request("set_custom_eq", params)
   }
 
   function saveDiagnosticReport(path) {

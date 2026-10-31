@@ -137,9 +137,24 @@ PopupCard reports at least 560 logical px of usable screen width. The panel targ
 and continues to let PopupCard cap both dimensions to the active screen.
 
 Short EQ presets share rows while long device-provided names receive a full row.
-Device-defined custom bands remain in the EQ section and use a two-across editor,
-reducing six bands to three rows without changing any command or capability logic.
+Device-defined custom bands remain in the EQ section. The original numeric
+editor arranged six bands in three rows; the curve editor described below now
+replaces those fields without changing their wire format.
 The offscreen Qt test covers both sides of the responsive breakpoint. Live review
 on a 1920×1080 display at 1.5× scale reported a 600×474 panel with the full Pro 2
 ANC, five-preset and six-band custom-EQ surfaces visible without scrolling. The
 user accepted the revised layout on 2026-09-11.
+
+
+The custom-EQ curve replaces SpinBoxes/Apply. EqCurveEditor.qml draws bounded
+monotone segments using Qt Quick Shapes; line, point borders, values and the
+transparent-gradient fill bind to the live shell accent. Input previews locally
+and emits one complete-curve save on changed pointer/key release. Polling the
+same entry does not reset a gesture; hiding, disabling, slot or device changes
+cancel it. A saved-slot choice activates that curve directly.
+
+Service setCustomEq accepts an optional deviceId. The bridge validates its
+opaque64-hex token, and the controller checks physical address/product before
+and after session recovery. The OPO payload is unchanged. Confirmed/failed
+responses settle the graph from current device data; unconfirmed saves show an
+error. Legacy two-argument API calls remain supported.
