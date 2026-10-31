@@ -290,6 +290,50 @@ def set_custom_eq(entry_id: int, gains_db: tuple[int, ...],
     return write_custom_eq(entry_id, gains_db, address).to_dict()
 
 
+def write_create_custom_eq(name: str, address: str | None = None) -> EqControlResult:
+    device = select_device(address)
+    session, _status, _events = OpoSession.bootstrap(device)
+    try:
+        result, _batch = session.create_custom_eq(name)
+        return result
+    finally:
+        session.__exit__(None, None, None)
+
+
+def create_custom_eq(name: str, address: str | None = None) -> dict[str, object]:
+    return write_create_custom_eq(name, address).to_dict()
+
+
+def write_rename_custom_eq(entry_id: int, name: str,
+                            address: str | None = None) -> EqControlResult:
+    device = select_device(address)
+    session, _status, _events = OpoSession.bootstrap(device)
+    try:
+        result, _batch = session.rename_custom_eq(entry_id, name)
+        return result
+    finally:
+        session.__exit__(None, None, None)
+
+
+def rename_custom_eq(entry_id: int, name: str,
+                     address: str | None = None) -> dict[str, object]:
+    return write_rename_custom_eq(entry_id, name, address).to_dict()
+
+
+def write_delete_custom_eq(entry_id: int, address: str | None = None) -> EqControlResult:
+    device = select_device(address)
+    session, _status, _events = OpoSession.bootstrap(device)
+    try:
+        result, _batch = session.delete_custom_eq(entry_id)
+        return result
+    finally:
+        session.__exit__(None, None, None)
+
+
+def delete_custom_eq(entry_id: int, address: str | None = None) -> dict[str, object]:
+    return write_delete_custom_eq(entry_id, address).to_dict()
+
+
 def diagnostics_report(address: str | None = None) -> dict[str, object]:
     device = select_device(address)
     status = read_status(device.address)

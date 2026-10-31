@@ -450,3 +450,42 @@ A native pointer test changed62Hz4->5->4 with ACK00 and verified readback.
 An independent query during each held drag showed the previous62Hz value.
 The original full curve and entry7 were restored after the test. See
 [measurement](../measurements/2026-10-31-nord-eq-curve.json).
+
+### Custom EQ profiles: create, rename, delete (2026-10-31)
+
+The phone app (Wireless Earphones 17.6.6) creates and renames custom profiles
+with the same `0x0418` command that edits a curve. The first payload byte is
+the action: `1` creates a profile, `2` updates it (curve **or** name) and `3`
+deletes it. The remaining payload is the entry definition
+`[min, max, eq_id, name_length, name, band_count, (frequency_u16le, gain_i8)…]`
+and is identical for all three actions.
+
+Measured on the owner's unit through the running plugin bridge:
+
+| Operation | Action | Result |
+|---|---:|---|
+| Create `Plugin Test` | 1 | ACK `00`; new profile stored as id 9 with a flat curve |
+| Rename id 9 to `Plugin Test 2` | 2 | ACK `00`; new name stored, curve unchanged |
+| Delete id 9 | 3 | ACK `00`; profile removed from the catalogue |
+
+The device accepted the requested next free slot id (9) directly; the phone
+app sends `0` and lets the device choose the slot. The plugin asks for the next
+free id (factory presets occupy 0..6, the existing custom profiles 7 and 8)
+and learns the stored id from a fresh `0x0122` catalogue read. Band layout and
+gain limits are always copied from a device-declared profile, never invented.
+
+Writing a custom entry also selects it on this firmware. Creating or renaming
+a profile therefore re-selects the profile that was active before the write,
+so the sound does not change silently. A rejected or unconfirmed write is
+never repeated; the panel keeps the typed name and shows the error.
+
+The test profile was deleted afterwards and the catalogue was identical to the
+starting state (id 7 `Test eq` `[4,6,2,0,4,6]`, id 8 `Benutzerdefiniert1`
+`[-5,0,-6,0,0,0]`, id 8 active). See
+[measurement](../measurements/2026-10-31-nord-eq-profiles.json).
+
+The panel shows the profile dropdown shortened with a pencil button (rename)
+and a plus button (new profile) on the right. Both turn the dropdown into a
+name field; the plus button stores a new profile in the next free slot, the
+pencil renames the selected profile. The delete action exists in the backend
+and CLI to restore test states, but is not exposed in the panel.

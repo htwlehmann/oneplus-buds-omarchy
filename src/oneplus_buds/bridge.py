@@ -164,6 +164,58 @@ class BudsFrontendBridge:
                 self.controller.eq_status()
                 result = self._serialize_eq_control(control)
                 self._on_snapshot(self.controller.snapshot())
+            elif command == "create_custom_eq":
+                # Local fork: create a new custom profile in the next free slot.
+                self._require_parameters(command, params,
+                    {"name", "device_id"} if "device_id" in params else {"name"})
+                name = params["name"]
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError("create_custom_eq parameter 'name' must be a non-empty string")
+                device_id = params.get("device_id")
+                if "device_id" in params and (not isinstance(device_id, str)
+                        or re.fullmatch(r"[0-9a-f]{64}", device_id) is None):
+                    raise ValueError("create_custom_eq device_id must be a snapshot device token")
+                control = self.controller.create_custom_eq(
+                    name, **({"device_id": device_id} if device_id is not None else {}))
+                self.controller.eq_status()
+                result = self._serialize_eq_control(control)
+                self._on_snapshot(self.controller.snapshot())
+            elif command == "rename_custom_eq":
+                # Local fork: rename an existing custom profile.
+                self._require_parameters(command, params,
+                    {"entry_id", "name", "device_id"} if "device_id" in params
+                    else {"entry_id", "name"})
+                entry_id, name = params["entry_id"], params["name"]
+                if not isinstance(entry_id, int) or isinstance(entry_id, bool):
+                    raise ValueError("rename_custom_eq parameter 'entry_id' must be an integer")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError("rename_custom_eq parameter 'name' must be a non-empty string")
+                device_id = params.get("device_id")
+                if "device_id" in params and (not isinstance(device_id, str)
+                        or re.fullmatch(r"[0-9a-f]{64}", device_id) is None):
+                    raise ValueError("rename_custom_eq device_id must be a snapshot device token")
+                control = self.controller.rename_custom_eq(
+                    entry_id, name,
+                    **({"device_id": device_id} if device_id is not None else {}))
+                self.controller.eq_status()
+                result = self._serialize_eq_control(control)
+                self._on_snapshot(self.controller.snapshot())
+            elif command == "delete_custom_eq":
+                # Local fork: delete a custom profile (used to restore test state).
+                self._require_parameters(command, params,
+                    {"entry_id", "device_id"} if "device_id" in params else {"entry_id"})
+                entry_id = params["entry_id"]
+                if not isinstance(entry_id, int) or isinstance(entry_id, bool):
+                    raise ValueError("delete_custom_eq parameter 'entry_id' must be an integer")
+                device_id = params.get("device_id")
+                if "device_id" in params and (not isinstance(device_id, str)
+                        or re.fullmatch(r"[0-9a-f]{64}", device_id) is None):
+                    raise ValueError("delete_custom_eq device_id must be a snapshot device token")
+                control = self.controller.delete_custom_eq(
+                    entry_id, **({"device_id": device_id} if device_id is not None else {}))
+                self.controller.eq_status()
+                result = self._serialize_eq_control(control)
+                self._on_snapshot(self.controller.snapshot())
             elif command == "save_diagnostic_report":
                 self._require_parameters(command, params, {"path"})
                 path = params["path"]

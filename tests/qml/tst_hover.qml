@@ -14,6 +14,7 @@ TestCase {
   property int eqStatusCalls: 0
   property var customRequest: null
   property var customRequests: []
+  property var profileRequests: []
   property int reportRequests: 0
   property string reportPath: ""
   property var touchRequest: null
@@ -47,6 +48,15 @@ TestCase {
   function setCustomEq(entryId, gains, deviceId) {
    customRequest = ({entry_id: entryId, gains: gains, device_id:deviceId || ""})
    customRequests = customRequests.concat([customRequest]); return nextId++
+  }
+  function createCustomEq(name, deviceId) {
+   profileRequests = profileRequests.concat([{action:"create", name:name, device_id:deviceId || ""}])
+   return nextId++
+  }
+  function renameCustomEq(entryId, name, deviceId) {
+   profileRequests = profileRequests.concat([{action:"rename", entry_id:entryId,
+     name:name, device_id:deviceId || ""}])
+   return nextId++
   }
   function saveDiagnosticReport(path) { reportRequests++; reportPath = path; return nextId++ }
  }
@@ -88,6 +98,7 @@ TestCase {
   service.eqStatusCalls = 0
   service.customRequest = null
   service.customRequests = []
+   service.profileRequests = []
   service.reportRequests = 0
   service.reportPath = ""
   service.touchRequest = null
@@ -712,5 +723,78 @@ TestCase {
   verify(!findChild(widget, "reportSavedGuidance").visible)
   compare(widget.savedReportFilename, "")
   widget.popupOpen = false
+ }
+ function test_custom_eq_profile_can_be_created_and_renamed() {
+  var state = {status:{model:"Nord",battery:{}}, anc_modes:[], capabilities:["eq"],
+   session_connected:true, eq_write_verified:true, custom_eq_write_verified:true,
+   eq:{current_id:7,current_name:"Test eq",gain_step_db:1,presets:[],
+    custom_entries:[{eq_id:7,name:"Test eq",min_gain_db:-6,max_gain_db:6,
+     bands:[{frequency_hz:62,gain_db:3},{frequency_hz:250,gain_db:1}]}]}}
+  service.snapshot = state
+  widget.popupOpen = true
+  while (widget.pendingRequestId >= 0)
+   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  wait(0)
+  widget.customEqExpanded = true
+  wait(0)
+  var row = findChild(widget, "customEqProfileRow")
+  var selector = findChild(widget, "customEqSelector")
+  var first = findChild(widget, "customEqFirstAction")
+  var second = findChild(widget, "customEqSecondAction")
+  var field = findChild(widget, "customEqNameField")
+  verify(row !== null && selector !== null && first !== null && second !== null)
+  verify(field !== null)
+  verify(row.visible)
+  verify(selector.visible && !field.visible)
+  verify(selector.width < row.width)
+  verify(first.x > selector.x + selector.width)
+  compare(second.x + second.width, row.width)
+  compare(first.text, "\u270e")
+  compare(second.text, "+")
+
+  second.clicked()
+  wait(0)
+  compare(widget.profileNameMode, "create")
+  verify(!selector.visible && field.visible)
+  compare(first.text, "\u2715")
+  compare(second.text, "\u2713")
+  widget.profileNameDraft = "Plugin Test"
+  second.clicked()
+  wait(0)
+  compare(service.profileRequests.length, 1)
+  compare(service.profileRequests[0].action, "create")
+  compare(service.profileRequests[0].name, "Plugin Test")
+  compare(widget.pendingKind, "custom_eq_create")
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{verified:true,current_id:8}}
+  wait(0)
+  compare(widget.profileNameMode, "")
+  verify(selector.visible && !field.visible)
+  verify(widget.outcome.indexOf("Verified") !== -1)
+
+  first.clicked()
+  wait(0)
+  compare(widget.profileNameMode, "rename")
+  compare(widget.profileNameDraft, "Test eq")
+  widget.profileNameDraft = "Rock"
+  second.clicked()
+  wait(0)
+  compare(service.profileRequests.length, 2)
+  compare(service.profileRequests[1].action, "rename")
+  compare(service.profileRequests[1].entry_id, 7)
+  compare(service.profileRequests[1].name, "Rock")
+  compare(widget.pendingKind, "custom_eq_rename")
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{verified:true,current_id:7}}
+  wait(0)
+  compare(widget.profileNameMode, "")
+
+  first.clicked()
+  wait(0)
+  compare(widget.profileNameMode, "rename")
+  first.clicked()
+  wait(0)
+  compare(widget.profileNameMode, "")
+  compare(service.profileRequests.length, 2)
  }
 }

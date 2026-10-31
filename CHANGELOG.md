@@ -2,6 +2,15 @@
 
 ## Unreleased — 0.1.0 release candidate
 
+- Create and rename custom EQ profiles like the phone app: the profile
+  dropdown is shortened and gets a pencil button (rename) and a plus button
+  (new profile) on the right; both turn the dropdown into a name field. The
+  new profile is stored in the next free device slot with the device's own
+  band layout, and the profile that was active before the write is
+  re-selected. The `0x0418` action byte (1 create, 2 update, 3 delete) was
+  verified on the Nord Buds 3 Pro, including a delete that restores the
+  previous catalogue state.
+
 - Add an app-like Play/Stop earbud search control with correct `0x8400`
   acknowledgement handling, shared uncertain/confirmed state, per-device
   50-second stop, close/shutdown cleanup, and device-bound queued commands.

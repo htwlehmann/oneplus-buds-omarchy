@@ -114,11 +114,22 @@ repeat count times:
 ```
 
 Detailed update `0x0418` action 2 omits `selected` but otherwise carries the same
-entry definition. Community sources also identify create=1 and delete=3; they are
-not exposed. The backend updates only a custom ID, layout, name and limits returned
+entry definition. The first payload byte is the action: 1 creates an entry,
+2 updates it (curve or name) and 3 deletes it. The phone app uses all three
+actions; `HeadsetCoreService.M0` builds
+`[action, min, max, eq_id, name_length, name, band_count, (frequency, gain)…]`.
+Community sources identified create=1 and delete=3 before they were used
+here. The backend updates only a custom ID, layout, name and limits returned
 by that connected device and rejects wrong band counts, non-integer gains,
 out-of-range gains, malformed UTF-8, duplicate/zero frequencies, truncation and
 trailing data before a packet can be sent.
+
+On the Nord Buds 3 Pro the action bytes were confirmed on the owner's unit
+(2026-10-31): create stored a new profile with the requested slot id, rename
+stored the new name with the unchanged curve, and delete removed the profile
+again. The device accepted the next free slot id (9) directly; the phone app
+sends 0 and lets the device choose. The plugin therefore asks for the next
+free id and learns the stored id from a fresh catalogue read.
 
 Factory names are profile-specific. Buds Pro exposes IDs 0 Balanced, 1 Deep Sea
 Bass, 2 Pure Vocals, and 3 Bright & Crisp. On Buds Pro 2 firmware `196.196.101`,

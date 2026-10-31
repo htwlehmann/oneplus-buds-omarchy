@@ -146,6 +146,15 @@ BarWidget {
   readonly property string customEqDeviceKey: snapshot && snapshot.find_device_id
     ? String(snapshot.find_device_id) : ""
   property bool customEqExpanded: false
+  // Local fork: the profile dropdown turns into a name field while a profile
+  // is created or renamed, the way the phone app does it.
+  property string profileNameMode: ""
+  property string profileNameDraft: ""
+  property int profileRenameEntryId: -1
+  readonly property bool customEqWritable: !!(snapshot
+    && snapshot.custom_eq_write_verified === true
+    && snapshot.session_connected === true
+    && connection === "connected" && pendingRequestId < 0)
   property bool touchControlsExpanded: false
   property bool reportDetailsOpen: false
   property bool reportSaved: false
@@ -188,6 +197,7 @@ BarWidget {
       customEqExpanded = false
       touchControlsExpanded = false
       resetHoldCycleDraft()
+      cancelProfileName()
       customSelectionDirty = false
       syncCustomSlotFromEq()
       collapseTimer.stop()
@@ -422,6 +432,67 @@ BarWidget {
       saveCustomEq(entry.eq_id, entry.bands.map(function(b) { return b.gain_db }), customEqDeviceKey)
   }
 
+  // Local fork: create a new custom profile in the next free device slot.
+  function startProfileCreate() {
+    if (!customEqWritable) return
+    profileNameMode = "create"
+    profileNameDraft = ""
+    profileRenameEntryId = -1
+    outcome = ""
+    customEqNameField.text = ""
+    Qt.callLater(function() { customEqNameField.forceActiveFocus() })
+  }
+
+  // Local fork: rename the profile that is selected in the dropdown.
+  function startProfileRename() {
+    if (!customEqWritable || !selectedCustom) return
+    profileNameMode = "rename"
+    profileRenameEntryId = selectedCustom.eq_id
+    profileNameDraft = String(selectedCustom.name || "")
+    outcome = ""
+    customEqNameField.text = profileNameDraft
+    Qt.callLater(function() {
+      customEqNameField.forceActiveFocus()
+      customEqNameField.selectAll()
+    })
+  }
+
+  function cancelProfileName() {
+    profileNameMode = ""
+    profileNameDraft = ""
+    profileRenameEntryId = -1
+  }
+
+  function commitProfileName() {
+    var value = String(profileNameDraft || "").trim()
+    if (!value) { outcome = "The profile name must not be empty"; return }
+    if (profileNameMode === "create") createCustomProfile(value)
+    else if (profileNameMode === "rename") renameCustomProfile(profileRenameEntryId, value)
+    else cancelProfileName()
+  }
+
+  function createCustomProfile(name) {
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    var requestId = budsService.createCustomEq(name, customEqDeviceKey)
+    if (requestId === null) { outcome = "Could not start request"; return }
+    pendingRequestId = requestId
+    pendingKind = "custom_eq_create"
+    pendingMode = name
+    outcome = ""
+    requestWatchdog.restart()
+  }
+
+  function renameCustomProfile(entryId, name) {
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    var requestId = budsService.renameCustomEq(entryId, name, customEqDeviceKey)
+    if (requestId === null) { outcome = "Could not start request"; return }
+    pendingRequestId = requestId
+    pendingKind = "custom_eq_rename"
+    pendingMode = name
+    outcome = ""
+    requestWatchdog.restart()
+  }
+
   function saveDiagnosticReport(fileUrl) {
     if (!budsService || pendingRequestId >= 0) return
     var destination = String(fileUrl || "")
@@ -534,11 +605,27 @@ BarWidget {
       return
     }
     if (response.ok === true && (completedKind === "eq_status"
-        || completedKind === "eq" || completedKind === "custom_eq")) {
+        || completedKind === "eq" || completedKind === "custom_eq"
+        || completedKind === "custom_eq_create"
+        || completedKind === "custom_eq_rename")) {
       customSelectionDirty = false
       syncCustomSlotFromEq()
     }
     if (completedKind === "custom_eq") customCurve.settle()
+    if (completedKind === "custom_eq_create" && response.ok === true) {
+      // Show the freshly created profile in the dropdown.
+      var createdId = response.result ? Number(response.result.current_id) : -1
+      for (var i = 0; i < customEqEntries.length; i++) {
+        if (customEqEntries[i].eq_id === createdId) {
+          customSlotIndex = i
+          customSelectionDirty = true
+          break
+        }
+      }
+      cancelProfileName()
+    }
+    if (completedKind === "custom_eq_rename" && response.ok === true)
+      cancelProfileName()
     if (response.ok === true) {
       if (completedKind === "custom_eq" && (!response.result || response.result.verified !== true)) {
         outcome = "EQ change was not confirmed by earbuds"
@@ -923,13 +1010,111 @@ BarWidget {
                 onClicked: root.customEqExpanded = !root.customEqExpanded
               }
 
-              Controls.ComboBox {
+              Row {
+                id: customEqProfileRow
+                objectName: "customEqProfileRow"
                 width: parent.width
+                spacing: Style.space(4)
                 visible: root.customEqExpanded && root.customEqEntries.length > 0
-                model: root.customEqEntries.map(function(entry) { return entry.name })
-                currentIndex: root.customSlotIndex
-                enabled: root.customEqExpanded && root.pendingRequestId < 0
-                onActivated: function(index) { root.activateCustomSlot(index) }
+
+                readonly property real actionWidth: Style.space(28)
+                readonly property real fieldWidth: Math.max(0, width
+                  - 2 * actionWidth - 2 * spacing)
+
+                Controls.ComboBox {
+                  id: customEqSelector
+                  objectName: "customEqSelector"
+                  width: parent.fieldWidth
+                  height: Style.space(32)
+                  visible: root.profileNameMode === ""
+                  model: root.customEqEntries.map(function(entry) { return entry.name })
+                  currentIndex: root.customSlotIndex
+                  enabled: root.customEqExpanded && root.pendingRequestId < 0
+                  onActivated: function(index) { root.activateCustomSlot(index) }
+                }
+
+                Controls.TextField {
+                  id: customEqNameField
+                  objectName: "customEqNameField"
+                  width: parent.fieldWidth
+                  height: Style.space(32)
+                  visible: root.profileNameMode !== ""
+                  selectByMouse: true
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  onTextEdited: root.profileNameDraft = text
+                  onAccepted: root.commitProfileName()
+                  Keys.onEscapePressed: root.cancelProfileName()
+                }
+
+                Button {
+                  id: customEqFirstAction
+                  objectName: "customEqFirstAction"
+                  width: parent.actionWidth
+                  height: Style.space(28)
+                  text: root.profileNameMode === "" ? "✎" : "✕"
+                  bordered: false
+                  enabled: root.profileNameMode === ""
+                    ? root.customEqWritable && !!root.selectedCustom
+                    : root.pendingRequestId < 0
+                  opacity: enabled ? 1.0 : 0.5
+                  foreground: root.bar.foreground
+                  background: root.bar.background
+                  accent: Color.accent
+                  fontFamily: root.bar.fontFamily
+                  onClicked: {
+                    if (root.profileNameMode === "") root.startProfileRename()
+                    else root.cancelProfileName()
+                  }
+
+                  HoverHandler { id: customEqFirstHover }
+
+                  Controls.ToolTip {
+                    visible: customEqFirstHover.hovered && customEqFirstAction.visible
+                    text: root.profileNameMode === "" ? "Rename profile" : "Cancel"
+                    delay: 400
+                    font.family: root.bar.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    palette.toolTipBase: root.bar.background
+                    palette.toolTipText: root.bar.foreground
+                    palette.dark: Color.accent
+                  }
+                }
+
+                Button {
+                  id: customEqSecondAction
+                  objectName: "customEqSecondAction"
+                  width: parent.actionWidth
+                  height: Style.space(28)
+                  text: root.profileNameMode === "" ? "+" : "✓"
+                  bordered: false
+                  enabled: root.profileNameMode === ""
+                    ? root.customEqWritable
+                    : root.pendingRequestId < 0
+                    && String(root.profileNameDraft || "").trim().length > 0
+                  opacity: enabled ? 1.0 : 0.5
+                  foreground: root.bar.foreground
+                  background: root.bar.background
+                  accent: Color.accent
+                  fontFamily: root.bar.fontFamily
+                  onClicked: {
+                    if (root.profileNameMode === "") root.startProfileCreate()
+                    else root.commitProfileName()
+                  }
+
+                  HoverHandler { id: customEqSecondHover }
+
+                  Controls.ToolTip {
+                    visible: customEqSecondHover.hovered && customEqSecondAction.visible
+                    text: root.profileNameMode === "" ? "New profile" : "Save name"
+                    delay: 400
+                    font.family: root.bar.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    palette.toolTipBase: root.bar.background
+                    palette.toolTipText: root.bar.foreground
+                    palette.dark: Color.accent
+                  }
+                }
               }
 
               EqCurveEditor {

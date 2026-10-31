@@ -45,6 +45,9 @@ PYTHONPATH=src python -m oneplus_buds.cli eq list
 PYTHONPATH=src python -m oneplus_buds.cli eq set bass
 PYTHONPATH=src python -m oneplus_buds.cli eq set custom:4
 PYTHONPATH=src python -m oneplus_buds.cli eq custom 5 0 0 0 0 0 0
+PYTHONPATH=src python -m oneplus_buds.cli eq create "Rock"
+PYTHONPATH=src python -m oneplus_buds.cli eq rename 5 "Rock 2"
+PYTHONPATH=src python -m oneplus_buds.cli eq delete 5
 PYTHONPATH=src python -m oneplus_buds.cli diagnostics --report
 ```
 
@@ -55,6 +58,14 @@ definitions. `eq set` accepts listed keys, numeric factory IDs, or `custom:<id>`
 one whole-dB value per returned band, within its returned limits. Every write
 pre-reads state, sends once, and verifies with fresh queries. Unknown devices and
 unverified feature/model combinations cannot write.
+
+`eq create` stores a new custom profile in the next free device slot, `eq
+rename` renames an existing device-declared profile without changing its curve
+and `eq delete` removes one. The band layout and the gain limits are copied
+from a device-declared profile; the plugin never invents them. The profile that
+was active before a create or rename is re-selected afterwards, because writing
+a custom entry selects it on the tested firmware. `eq delete` exists to restore
+a test state and has no panel button.
 
 Select among multiple connected compatible devices by putting the global option before the command:
 

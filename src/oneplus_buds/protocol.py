@@ -70,6 +70,13 @@ FEATURE_SWITCH_NAMES = {
 FEATURE_SWITCH_QUERY_PREFIX = bytes((1,))
 FEATURE_SWITCH_WRITE = bytes((1,))
 
+# The phone app sends one action byte in front of a custom EQ entry
+# definition: 1 creates an entry, 2 updates it (curve or name) and 3
+# deletes it. The rest of the payload is identical for all three actions.
+EQ_ACTION_CREATE = 1
+EQ_ACTION_UPDATE = 2
+EQ_ACTION_DELETE = 3
+
 # The bass engine level ("BassWave") travels as [min, max, value]. The phone
 # app sends the allowed range together with the wanted value, and the device
 # echoes the same three bytes back as a notification.
@@ -383,8 +390,17 @@ def parse_set_eq_status(frame: Frame) -> int | None:
     return frame.payload[0]
 
 
-def encode_eq_detail_payload(entry: EqEntry, gains_db: tuple[int, ...]) -> bytes:
-    """Encode an update of an existing custom entry after strict validation."""
+def encode_eq_detail_payload(entry: EqEntry, gains_db: tuple[int, ...], *,
+                             action: int = EQ_ACTION_UPDATE,
+                             name: str | None = None) -> bytes:
+    """Encode a custom EQ entry operation after strict validation.
+
+    ``action`` selects the device operation (1 create, 2 update, 3 delete).
+    ``name`` overrides the stored name for a rename; it defaults to the name
+    the earbuds reported for the entry.
+    """
+    if action not in (EQ_ACTION_CREATE, EQ_ACTION_UPDATE, EQ_ACTION_DELETE):
+        raise ValueError("unsupported custom EQ action")
     if not 0 <= entry.eq_id <= 0xFF:
         raise ValueError("EQ id must fit in one byte")
     if len(gains_db) != len(entry.bands):
@@ -394,12 +410,13 @@ def encode_eq_detail_payload(entry: EqEntry, gains_db: tuple[int, ...]) -> bytes
         raise ValueError(
             f"custom EQ gains must be whole dB values from {entry.min_gain_db} to {entry.max_gain_db}"
         )
-    name = entry.name.encode("utf-8")
-    if len(name) > 0xFF or len(entry.bands) > 0xFF:
+    label = entry.name if name is None else name
+    encoded_name = label.encode("utf-8")
+    if len(encoded_name) > 0xFF or len(entry.bands) > 0xFF:
         raise ValueError("custom EQ definition is too large")
-    payload = bytearray((2, entry.min_gain_db & 0xFF, entry.max_gain_db & 0xFF,
-                         entry.eq_id, len(name)))
-    payload.extend(name)
+    payload = bytearray((action, entry.min_gain_db & 0xFF, entry.max_gain_db & 0xFF,
+                         entry.eq_id, len(encoded_name)))
+    payload.extend(encoded_name)
     payload.append(len(entry.bands))
     for band, gain in zip(entry.bands, gains_db, strict=True):
         if not 0 < band.frequency_hz <= 0xFFFF:

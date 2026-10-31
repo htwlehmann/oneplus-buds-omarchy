@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict
 from time import monotonic
 
@@ -57,6 +58,9 @@ from .protocol import (
     FEATURE_SWITCH_NAMES,
     EQ_ALL_QUERY_PAYLOAD,
     EqEntry,
+    EQ_ACTION_CREATE,
+    EQ_ACTION_DELETE,
+    EQ_ACTION_UPDATE,
     encode_eq_detail_payload,
     parse_anc_state,
     parse_battery,
@@ -77,6 +81,22 @@ class UnsupportedProductError(RuntimeError):
         super().__init__(f"product {product_id or 'unknown'} has no tested device profile")
         self.device = device
         self.product_id = product_id
+
+
+def validate_eq_profile_name(name: str) -> str:
+    """Return a trimmed profile name that the protocol can carry.
+
+    The phone app limits the name to a UTF-8 byte length and rejects control
+    characters; the wire format carries the length in a single byte.
+    """
+    label = str(name or "").strip()
+    if not label:
+        raise ValueError("the EQ profile name must not be empty")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in label):
+        raise ValueError("the EQ profile name must not contain control characters")
+    if len(label.encode("utf-8")) > 0xFF:
+        raise ValueError("the EQ profile name is too long")
+    return label
 
 
 class OpoSession:
@@ -437,6 +457,202 @@ class OpoSession:
             ), EventBatch(tuple(events), ignored)
         except (OSError, RuntimeError) as error:
             raise RuntimeError("custom EQ session request failed: " + str(error)) from error
+
+    def create_custom_eq(self, name: str) -> tuple[EqControlResult, EventBatch]:
+        """Create one new custom curve in the next free slot of the earbuds.
+
+        The phone app creates a profile with action byte 1 and lets the
+        earbuds pick the slot. The plugin asks for the next free slot id and
+        learns the id the earbuds really used from a fresh catalogue read.
+        The band layout and the gain limits are always taken from the device.
+        """
+        self._require_eq_session(write=True)
+        if self.profile.eq is None or not self.profile.eq.custom_write_verified:
+            raise ValueError("custom EQ writes are not hardware-verified for this device profile")
+        label = validate_eq_profile_name(name)
+        timer = PhaseTimer()
+        before, initial = self.eq_status()
+        timer.mark("preserve_read")
+        template = before.custom_entries[0] if before.custom_entries else None
+        if template is None:
+            raise RuntimeError("the earbuds did not declare a custom EQ layout")
+        used = {item.eq_id for item in before.custom_entries}
+        slot = max(used) + 1 if used else 0
+        if slot > 0xFF:
+            raise RuntimeError("no free custom EQ slot is left")
+        entry = EqEntry(slot, label, False, template.min_gain_db, template.max_gain_db,
+                        template.bands)
+        gains = tuple(0 for _ in template.bands)
+
+        def expect(entries: tuple[EqEntry, ...]) -> bool:
+            return any(item.eq_id not in used or item.name == label for item in entries)
+
+        acknowledgement, entries, _current_id, query_count, events, ignored = (
+            self._write_eq_entry(entry, gains, action=EQ_ACTION_CREATE, expect=expect)
+        )
+        created = None
+        if entries is not None:
+            fresh = [item for item in entries if item.eq_id not in used]
+            if len(fresh) == 1:
+                created = fresh[0]
+            else:
+                named = [item for item in entries if item.name == label]
+                created = named[0] if len(named) == 1 else None
+        if created is None:
+            raise RuntimeError(
+                "custom EQ verification failed: the earbuds did not store the new profile"
+            )
+        events = list(initial.events) + list(events)
+        ignored += initial.ignored_frames
+        self._restore_eq_selection(before)
+        return EqControlResult(
+            self.device.name, self.profile.product_id, created.eq_id, created.name,
+            before.current_id, before.current_name,
+            acknowledgement, True, timer.finish("session_total"), query_count,
+        ), EventBatch(tuple(events), ignored)
+
+    def rename_custom_eq(self, entry_id: int, name: str) -> tuple[EqControlResult, EventBatch]:
+        """Rename one existing device-declared custom curve.
+
+        The phone app renames a profile with the same update action it uses
+        for a curve change: the entry keeps its id, bands and gains and only
+        the name is replaced.
+        """
+        self._require_eq_session(write=True)
+        if self.profile.eq is None or not self.profile.eq.custom_write_verified:
+            raise ValueError("custom EQ writes are not hardware-verified for this device profile")
+        label = validate_eq_profile_name(name)
+        timer = PhaseTimer()
+        before, initial = self.eq_status()
+        timer.mark("preserve_read")
+        entry = next((item for item in before.custom_entries if item.eq_id == entry_id), None)
+        if entry is None:
+            raise ValueError("custom EQ id was not declared by the connected earbuds")
+        gains = tuple(band.gain_db for band in entry.bands)
+
+        def expect(entries: tuple[EqEntry, ...]) -> bool:
+            item = next((value for value in entries if value.eq_id == entry_id), None)
+            return item is not None and item.name == label
+
+        acknowledgement, entries, _current_id, query_count, events, ignored = (
+            self._write_eq_entry(entry, gains, action=EQ_ACTION_UPDATE, name=label,
+                                 expect=expect)
+        )
+        renamed = next((item for item in entries or () if item.eq_id == entry_id), None)
+        if renamed is None or renamed.name != label:
+            raise RuntimeError(
+                "custom EQ verification failed: the earbuds did not store the new name"
+            )
+        events = list(initial.events) + list(events)
+        ignored += initial.ignored_frames
+        self._restore_eq_selection(before)
+        return EqControlResult(
+            self.device.name, self.profile.product_id, entry_id, renamed.name,
+            before.current_id, before.current_name,
+            acknowledgement, True, timer.finish("session_total"), query_count,
+        ), EventBatch(tuple(events), ignored)
+
+    def delete_custom_eq(self, entry_id: int) -> tuple[EqControlResult, EventBatch]:
+        """Delete one existing device-declared custom curve."""
+        self._require_eq_session(write=True)
+        if self.profile.eq is None or not self.profile.eq.custom_write_verified:
+            raise ValueError("custom EQ writes are not hardware-verified for this device profile")
+        timer = PhaseTimer()
+        before, initial = self.eq_status()
+        timer.mark("preserve_read")
+        entry = next((item for item in before.custom_entries if item.eq_id == entry_id), None)
+        if entry is None:
+            raise ValueError("custom EQ id was not declared by the connected earbuds")
+        gains = tuple(band.gain_db for band in entry.bands)
+
+        def expect(entries: tuple[EqEntry, ...]) -> bool:
+            return all(item.eq_id != entry_id for item in entries)
+
+        acknowledgement, entries, _current_id, query_count, events, ignored = (
+            self._write_eq_entry(entry, gains, action=EQ_ACTION_DELETE, expect=expect)
+        )
+        if entries is not None and any(item.eq_id == entry_id for item in entries):
+            raise RuntimeError(
+                "custom EQ verification failed: the earbuds still list the profile"
+            )
+        events = list(initial.events) + list(events)
+        ignored += initial.ignored_frames
+        return EqControlResult(
+            self.device.name, self.profile.product_id, entry_id, entry.name,
+            before.current_id, before.current_name,
+            acknowledgement, True, timer.finish("session_total"), query_count,
+        ), EventBatch(tuple(events), ignored)
+
+    def _write_eq_entry(self, entry: EqEntry, gains_db: tuple[int, ...], *,
+                        action: int, name: str | None = None,
+                        expect: Callable[[tuple[EqEntry, ...]], bool] | None = None
+                        ) -> tuple[int | None, tuple[EqEntry, ...] | None, int | None,
+                                   int, list[SafeEvent], int]:
+        """Send one custom EQ entry operation once and read the catalogue back.
+
+        The write is never repeated. The verification uses fresh device
+        queries until the earbuds report the expected catalogue state.
+        """
+        timer = PhaseTimer()
+        payload = encode_eq_detail_payload(entry, gains_db, action=action, name=name)
+        events: list[SafeEvent] = []
+        ignored = 0
+
+        def collect(frames: list[Frame]) -> None:
+            nonlocal ignored
+            batch = self._redact(frames)
+            events.extend(batch.events)
+            del events[:-64]
+            ignored += batch.ignored_frames
+
+        try:
+            try:
+                acknowledgement = self._transport.request(
+                    SET_EQ_DETAIL, payload, RESPONSE_SET_EQ_DETAIL,
+                    on_sent=lambda: timer.elapsed("command_sent_elapsed"), on_frames=collect,
+                )
+            except TimeoutError:
+                acknowledgement = None
+            timer.mark("set_response")
+            entries: tuple[EqEntry, ...] | None = None
+            deadline = monotonic() + 2.0
+            query_count = 0
+            for query_count in range(1, 33):
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    break
+                frame = self._transport.request(
+                    QUERY_EQ_ALL, EQ_ALL_QUERY_PAYLOAD, RESPONSE_EQ_ALL,
+                    on_frames=collect, timeout=remaining,
+                )
+                entries = parse_eq_entries(frame)
+                if entries is not None and (expect is None or expect(entries)):
+                    break
+            timer.mark("verify_query")
+            current = self._transport.request(QUERY_EQ, b"", RESPONSE_EQ, on_frames=collect)
+            current_id = parse_eq_id(current)
+            timer.elapsed("verified_elapsed")
+            return (parse_set_eq_status(acknowledgement) if acknowledgement else None,
+                    entries, current_id, query_count, events, ignored)
+        except (OSError, RuntimeError) as error:
+            raise RuntimeError("custom EQ session request failed: " + str(error)) from error
+
+    def _restore_eq_selection(self, before: EqStatusResult) -> None:
+        """Re-select the profile that was active before an entry write.
+
+        Writing a custom entry also selects it on the tested firmware. A
+        profile that is created or renamed must not silently change the
+        sound, so the previous selection is restored afterwards.
+        """
+        current, _batch = self.eq_status()
+        if current.current_id == before.current_id:
+            return
+        custom = next((item for item in before.custom_entries
+                       if item.eq_id == before.current_id), None)
+        if custom is not None:
+            self.set_custom_eq(custom.eq_id, tuple(band.gain_db for band in custom.bands))
+            return
+        self.set_eq(str(before.current_id))
 
     def _require_eq_session(self, *, write: bool) -> None:
         self._require_connected()

@@ -158,3 +158,10 @@ opaque64-hex token, and the controller checks physical address/product before
 and after session recovery. The OPO payload is unchanged. Confirmed/failed
 responses settle the graph from current device data; unconfirmed saves show an
 error. Legacy two-argument API calls remain supported.
+
+The custom profile dropdown is shortened so a pencil button (rename) and a
+plus button (new profile) fit on the right. Both replace the dropdown with a
+name field; Enter or the check button stores the name, the cross button
+cancels. Service createCustomEq/renameCustomEq use the same optional deviceId
+token as setCustomEq. The new profile is created in the next free device slot
+and the profile that was active before the write is re-selected afterwards.

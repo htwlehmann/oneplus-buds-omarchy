@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 
-from .backend import (device_summary, diagnostics_report, query_capabilities, query_eq,
-                      query_status, read_raw_query, set_anc, set_custom_eq, set_eq)
+from .backend import (create_custom_eq, delete_custom_eq, device_summary, diagnostics_report,
+                      query_capabilities, query_eq, query_status, read_raw_query,
+                      rename_custom_eq, set_anc, set_custom_eq, set_eq)
 from .bluez import connected_devices
 
 
@@ -31,6 +32,13 @@ def main() -> None:
     eq_custom = eq_commands.add_parser("custom", help="update an existing device-declared custom curve")
     eq_custom.add_argument("entry_id", type=int, help="custom entry id returned by eq status")
     eq_custom.add_argument("gains", nargs="+", type=int, help="one whole-dB gain per reported band")
+    eq_create = eq_commands.add_parser("create", help="create a custom curve in the next free slot")
+    eq_create.add_argument("name", help="name of the new custom profile")
+    eq_rename = eq_commands.add_parser("rename", help="rename an existing custom curve")
+    eq_rename.add_argument("entry_id", type=int, help="custom entry id returned by eq status")
+    eq_rename.add_argument("name", help="new profile name")
+    eq_delete = eq_commands.add_parser("delete", help="delete an existing custom curve")
+    eq_delete.add_argument("entry_id", type=int, help="custom entry id returned by eq status")
     raw_parser = subparsers.add_parser(
         "raw", help="read-only raw protocol query (capability discovery)"
     )
@@ -69,6 +77,12 @@ def main() -> None:
                 }
             elif args.eq_command == "custom":
                 output = set_custom_eq(args.entry_id, tuple(args.gains), args.device)
+            elif args.eq_command == "create":
+                output = create_custom_eq(args.name, args.device)
+            elif args.eq_command == "rename":
+                output = rename_custom_eq(args.entry_id, args.name, args.device)
+            elif args.eq_command == "delete":
+                output = delete_custom_eq(args.entry_id, args.device)
             else:
                 output = set_eq(args.preset, args.device)
         elif args.mode == "status":

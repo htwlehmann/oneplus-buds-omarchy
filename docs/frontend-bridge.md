@@ -63,12 +63,26 @@ interrupt control. Without a previous valid level, the case field is omitted.
 - `set_custom_eq` with exactly `{"entry_id": number, "gains_db": [integers...]}`:
   delegates strict band-count/range validation to the device capability layer,
   sends once, and emits only freshly verified state.
+- `create_custom_eq` with exactly `{"name": "..."}`: creates one new custom
+  profile in the next free device slot. The band layout and gain limits are
+  taken from the device, the slot id is read back from the device catalogue,
+  and the profile that was active before the write is re-selected afterwards.
+- `rename_custom_eq` with exactly `{"entry_id": number, "name": "..."}`: renames
+  one device-declared custom profile without changing its curve and re-selects
+  the previously active profile.
+- `delete_custom_eq` with exactly `{"entry_id": number}`: removes one
+  device-declared custom profile. It exists to restore a test state and is not
+  exposed in the panel.
 - `save_diagnostic_report` with exactly `{"path": local-file-url}`: builds a
   privacy-safe report from the cached snapshot and bounded recent errors, then
   writes it to the user-selected local path. It performs no device query or write
   and never uploads the report.
 
 Every call returns a `command_response` dictionary containing the schema version, request ID, command, `ok`, `result`, and `error`. Unknown commands and malformed parameter objects are rejected without hardware access. Runtime command errors are address-redacted. The bridge does not add unverified controls or bypass backend capability/profile checks.
+
+The custom profile commands optionally accept `{"device_id": "<opaque token>"}`
+from snapshot field `find_device_id`. The token rejects a command when the
+connected pair changed since the panel read the state.
 
 Report sanitisation lives in `oneplus_buds.report`, not QML. Reports omit device
 aliases, Bluetooth addresses, usernames, hostnames, home paths, credentials,

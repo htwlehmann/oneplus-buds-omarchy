@@ -189,6 +189,35 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(response["error"]["code"], "invalid_parameters")
         self.assertEqual(controller.custom_targets, [])
 
+    def test_profile_commands_create_rename_and_delete(self):
+        controller = FakeController()
+        bridge = BudsFrontendBridge(lambda _event: None, controller=controller)
+        created = bridge.execute("create_custom_eq", {"name": "Rock"})
+        renamed = bridge.execute("rename_custom_eq", {"entry_id": 4, "name": "Rock 2"})
+        deleted = bridge.execute("delete_custom_eq", {"entry_id": 4})
+        self.assertTrue(created["result"]["verified"])
+        self.assertTrue(renamed["result"]["verified"])
+        self.assertTrue(deleted["result"]["verified"])
+        self.assertEqual(created["result"]["current_name"], "Rock")
+        self.assertEqual(controller.profile_targets,
+                         [("create", "Rock"), ("rename", 4, "Rock 2"), ("delete", 4)])
+
+    def test_malformed_profile_commands_never_reach_the_controller(self):
+        controller = FakeController()
+        bridge = BudsFrontendBridge(lambda _event: None, controller=controller)
+        for command, parameters in (
+            ("create_custom_eq", {"name": "   "}),
+            ("create_custom_eq", {"name": 5}),
+            ("rename_custom_eq", {"entry_id": True, "name": "Rock"}),
+            ("rename_custom_eq", {"entry_id": 4}),
+            ("delete_custom_eq", {"entry_id": "4"}),
+            ("create_custom_eq", {"name": "Rock", "device_id": "nope"}),
+        ):
+            response = bridge.execute(command, parameters)
+            self.assertFalse(response["ok"])
+            self.assertEqual(response["error"]["code"], "invalid_parameters")
+        self.assertEqual(controller.profile_targets, [])
+
     def test_verified_response_does_not_reacquire_snapshot_during_recovery(self):
         controller = FakeController()
         with patch.object(controller, 'snapshot', side_effect=AssertionError('second lock acquisition')):
@@ -241,6 +270,7 @@ class FakeController:
         self.anc_modes = []
         self.eq_targets = []
         self.custom_targets = []
+        self.profile_targets = []
         self.current_snapshot = SNAPSHOT
 
     def snapshot(self):
@@ -277,6 +307,18 @@ class FakeController:
     def set_custom_eq(self, entry_id, gains):
         self.custom_targets.append((entry_id, gains))
         return EqControlResult(DEVICE.name, "062014", entry_id, "Custom", 0, "Balanced", 0, True)
+
+    def create_custom_eq(self, name, **_kwargs):
+        self.profile_targets.append(("create", name))
+        return EqControlResult(DEVICE.name, "062014", 5, name, 4, "Custom", 0, True)
+
+    def rename_custom_eq(self, entry_id, name, **_kwargs):
+        self.profile_targets.append(("rename", entry_id, name))
+        return EqControlResult(DEVICE.name, "062014", entry_id, name, 4, "Custom", 0, True)
+
+    def delete_custom_eq(self, entry_id, **_kwargs):
+        self.profile_targets.append(("delete", entry_id))
+        return EqControlResult(DEVICE.name, "062014", entry_id, "Custom", 4, "Custom", 0, True)
 
 
 class FakeRunner:

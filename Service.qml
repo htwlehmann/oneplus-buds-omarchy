@@ -112,6 +112,19 @@ Item {
     return request("set_custom_eq", params)
   }
 
+  // Local fork: create and rename custom EQ profiles like the phone app.
+  function createCustomEq(name, deviceId) {
+    var params = { name: String(name || "") }
+    if (deviceId) params.device_id = String(deviceId)
+    return request("create_custom_eq", params)
+  }
+
+  function renameCustomEq(entryId, name, deviceId) {
+    var params = { entry_id: Number(entryId), name: String(name || "") }
+    if (deviceId) params.device_id = String(deviceId)
+    return request("rename_custom_eq", params)
+  }
+
   function saveDiagnosticReport(path) {
     return request("save_diagnostic_report", { path: String(path || "") })
   }

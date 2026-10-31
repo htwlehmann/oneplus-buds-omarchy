@@ -239,6 +239,85 @@ class BudsController:
             self._generation += 1
             return result
 
+    def create_custom_eq(self, name: str, *,
+                         device_id: str | None = None) -> EqControlResult:
+        """Create a new custom EQ profile in the next free device slot."""
+        with self._lock:
+            self._require_running()
+            intended_key = self._find_key()
+            if device_id is not None and device_id != self._find_device_id():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
+            if self._session is None:
+                self.refresh()
+            if intended_key is not None and intended_key != self._find_key():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
+            try:
+                result, batch = cast(OpoSession, self._session).create_custom_eq(name)
+            except ValueError:
+                raise
+            except (OSError, RuntimeError):
+                self._close_session()
+                self._eq_status = None
+                self._generation += 1
+                raise
+            self._apply_batch(batch)
+            self._eq_status = None
+            self._generation += 1
+            return result
+
+    def rename_custom_eq(self, entry_id: int, name: str, *,
+                         device_id: str | None = None) -> EqControlResult:
+        """Rename an existing custom EQ profile."""
+        with self._lock:
+            self._require_running()
+            intended_key = self._find_key()
+            if device_id is not None and device_id != self._find_device_id():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
+            if self._session is None:
+                self.refresh()
+            if intended_key is not None and intended_key != self._find_key():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
+            try:
+                result, batch = cast(OpoSession, self._session).rename_custom_eq(
+                    entry_id, name)
+            except ValueError:
+                raise
+            except (OSError, RuntimeError):
+                self._close_session()
+                self._eq_status = None
+                self._generation += 1
+                raise
+            self._apply_batch(batch)
+            self._eq_status = None
+            self._generation += 1
+            return result
+
+    def delete_custom_eq(self, entry_id: int, *,
+                         device_id: str | None = None) -> EqControlResult:
+        """Delete an existing custom EQ profile."""
+        with self._lock:
+            self._require_running()
+            intended_key = self._find_key()
+            if device_id is not None and device_id != self._find_device_id():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
+            if self._session is None:
+                self.refresh()
+            if intended_key is not None and intended_key != self._find_key():
+                raise ValueError("Selected earbuds changed; EQ command was not sent")
+            try:
+                result, batch = cast(OpoSession, self._session).delete_custom_eq(entry_id)
+            except ValueError:
+                raise
+            except (OSError, RuntimeError):
+                self._close_session()
+                self._eq_status = None
+                self._generation += 1
+                raise
+            self._apply_batch(batch)
+            self._eq_status = None
+            self._generation += 1
+            return result
+
     def poll(self, wait: float = 0.2) -> ControllerSnapshot:
         with self._lock:
             self._require_running()
