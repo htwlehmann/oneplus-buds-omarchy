@@ -87,9 +87,12 @@ for units, nested totals, privacy scope, and the completed two-model hardware me
 Timing values do not imply successful verification; consumers must still check
 `ok` and `result.verified`.
 
-Main On/Off/Transparency requests now reuse the running controller's authenticated
-session and existing subscriptions. Success still requires a fresh, correlated
-state query. The result and matching snapshot are captured atomically, and no
+All profile-supported ANC requests reuse the running controller's authenticated
+session and existing subscriptions, including explicit strength and Auto.
+Success requires a fresh, correlated state query; on Nord Auto, a selected-mode
+notification can confirm Auto when the query reports its concrete active
+intensity or times out. A SET acknowledgement alone never verifies Auto.
+The result and matching snapshot are captured atomically, and no
 monitoring restoration blocks successful response delivery. Cold/legacy paths
 retain conservative authentication; see the timing documentation for scope.
 

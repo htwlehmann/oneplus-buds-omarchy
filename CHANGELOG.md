@@ -2,6 +2,11 @@
 
 ## Unreleased — 0.1.0 release candidate
 
+- Reuse the authenticated session for ANC strengths as well as main modes;
+  Nord Buds 3 Pro Low/Moderate/High/Auto selection was observed after
+  0.15–0.30 seconds instead of roughly 15 seconds. Verify Auto against its
+  selected-mode notification when the query reports adaptive intensity,
+  rejecting stale query responses and newer contradictory mode notifications.
 - Add an owner-verified device profile for the OnePlus Nord Buds 3 Pro
   (`064414`): measured ANC bitmap including Auto, seven native factory
   EQ slots without custom curves, plus device record, compatibility entry and

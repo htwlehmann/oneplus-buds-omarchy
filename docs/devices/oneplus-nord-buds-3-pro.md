@@ -79,6 +79,59 @@ using the SHA-256 of the app's signing certificate. Decrypted, the entry for
 `064414` lists exactly these indices, including Auto at index 7, and the
 plugin's independent measurements match it entry for entry.
 
+### ANC latency correction (2026-10-31)
+
+The controller accidentally restricted session reuse to On/Off/Transparency.
+All four strength buttons therefore closed the monitoring socket, rediscovered
+the device, authenticated, wrote, opened another socket for verification, then
+reconnected and resubscribed before returning the result. Live plugin measurements
+for Low and the restoration to Moderate took 15.52/15.30 seconds at the frontend;
+the backend consumed 8.45/8.47 seconds and monitoring restoration another
+6.88/6.74 seconds. The device's actual audible application time was not measured.
+
+All supported strengths now use the existing authenticated session. Measured
+controller verification times for Low/Moderate/High/Auto were 60.7/118.3/72.9/60.2 ms;
+the frontend's confirmed selection appeared after 149.7/302.7/152.0/151.2 ms.
+The IPC harness samples every 80 ms plus process overhead, so frontend values
+are observed bounds rather than exact render times. The original Moderate
+state was restored and confirmed after every test sequence.
+
+Auto had a second bug: a final query timeout bypassed its notification fallback,
+and repeated queries kept waiting for a fixed level despite receiving the
+selected Auto notification. A matching selected-mode notification now ends
+verification after the first readback, or survives a readback timeout. Neither
+an acknowledgement alone nor an intelligent-intensity notification can verify
+Auto. The live Auto selection stayed stable for a ten-second observation.
+
+The REA audit of the shipped `com.oplus.melody` 17.6.6 APK confirms every mapping
+in the table above. The app sends the same one-hot `CurrentNoiseModeInfo`
+type-1 payload through `0x0404`. It distinguishes selected-mode notifications
+`03 01 01 bitmap` from adaptive-intensity notifications `03 04 01 bitmap`.
+Its five-second future is a failure timeout, not a deliberate switching delay.
+Live while Auto was selected: query `0x010c 01 01` returned `00 01 01 40`, query
+`0x010c 04 01` returned `00 04 01 40`, while the selected notification remained
+`03 01 01 80`. The app's static parser expects the first query to reflect selected
+mode; the owner's firmware instead returns the active intensity in this case.
+
+App sources: `model/repository/earphone/G.java:t0/u0`,
+`btsdk/api/data/CurrentNoiseModeInfo.java:getData`,
+`btsdk/protocol/commands/k.java:h/s/M`, and `commands/f.java:b`.
+REA serialization Evidence: `ev_21005fcdf65e6dda1bc26c9b20786664d8cd4f668ed6439b8a0227faa3ff917d`;
+notification parser: `ev_24393d69618b7bf35d0357ccd9e1f5b068ec58369462de6bf1e3c82d99d69574`.
+The local export is `~/src/oneplus-buds-research/rea-anc-app-audit-2026-10-31-evidence.json`.
+HeyMelody 117.6.6 was not supplied and has not been compared.
+Sanitized hardware records: [ANC latency measurement](../measurements/2026-10-31-nord-anc-latency.json).
+
+The normal app UI exposes strength choices only after selecting the ANC parent:
+Off → On (`01 01 02`) → strength. It also guards against both buds being unworn
+or in the case (`NoiseReductionItem.java`). A later final-check attempt started
+from an externally changed Off state and Low did not apply; Off was restored.
+The wearing state at that attempt was unknown, so this does not establish an
+On prerequisite or a regression. Further hardware tests were paused pending
+the owner's confirmation that both buds are worn. The final provenance fix
+is covered by positive Auto tests and negative stale-response/contradictory-push
+regressions; only exact selected-mode notifications can provide its fallback.
+
 ## Native EQ
 
 The device accepts the seven factory IDs 0 to 6 and ignores 7 and 8: a selection

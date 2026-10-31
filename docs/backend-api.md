@@ -58,7 +58,7 @@ result = controller.set_eq("balanced")
 snapshot = controller.shutdown()
 ```
 
-It caches an immutable `ControllerSnapshot`, serializes every operation with one lock, and owns at most one `OpoSession`. Startup discovers a device, identifies its product/profile, authenticates, and reads essential battery/ANC state on one RFCOMM socket. The first usable snapshot is published at that point; subscription setup and firmware then populate on the same session. A refresh or legacy write closes the event socket first and restores notification subscription afterward. Main On/Off/Transparency writes on a running controller retain the authenticated socket and subscriptions, verify through fresh sequence-correlated state queries, and return immediately after verification. Explicit ANC levels and one-shot calls retain the legacy path. A polling transport error triggers one immediate reconnect; repeated failures propagate to the caller for service-level backoff. Shutdown always releases the RFCOMM socket.
+It caches an immutable `ControllerSnapshot`, serializes every operation with one lock, and owns at most one `OpoSession`. Startup discovers a device, identifies its product/profile, authenticates, and reads essential battery/ANC state on one RFCOMM socket. The first usable snapshot is published at that point; subscription setup and firmware then populate on the same session. A refresh or legacy write closes the event socket first and restores notification subscription afterward. All supported ANC writes on a running controller retain the authenticated socket and subscriptions, including explicit strengths and Auto, verify device state, and return immediately after verification. Normal writes require fresh sequence-correlated state queries. Nord Auto can use the selected-mode notification when the query reports the concrete adaptive intensity or times out; an acknowledgement alone does not verify it. One-shot calls and explicit `reuse_session=False` retain the legacy path. A polling transport error triggers one immediate reconnect; repeated failures propagate to the caller for service-level backoff. Shutdown always releases the RFCOMM socket.
 
 Safe battery, ANC, and named feature-switch events update cached typed state. Redacted notification codes are retained in a bounded 32-item history, ignored-frame counts are cumulative, and `generation` changes whenever meaningful state/event data is applied. The controller does not start threads or prescribe an event loop; a future daemon, QML bridge, or test harness controls polling cadence and backoff.
 
@@ -99,7 +99,7 @@ connection (including retries), verifier query, and verifier close. Exchanges
 include the existing conservative waits and receive-burst drain time.
 `backend_total` also includes parsing and validation overhead.
 
-Controller results add `controller_lock_wait`, `monitor_close`,
+Legacy controller results add `controller_lock_wait`, `monitor_close`,
 `backend_request`, `monitor_resume`, and `controller_total`. `backend_request`
 contains the backend phases: do not add it or the totals to those phases when
 computing a breakdown. Controller total ends after notification resubscription;
@@ -145,7 +145,7 @@ or shell-lifecycle testing.
 
 ### Persistent-session result timings
 
-For main modes on a running controller, `set_response`, `verify_query`, and
+For supported ANC modes and strengths on a running controller, `set_response`, `verify_query`, and
 `session_total` replace the legacy backend phase breakdown. `command_sent_elapsed`
 and `verified_elapsed` are cumulative milliseconds from the session method's
 entry; they are not additive phases and exclude controller lock wait/setup.

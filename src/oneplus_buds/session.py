@@ -192,7 +192,9 @@ class OpoSession:
     def set_anc(self, mode: str) -> tuple[ControlResult, EventBatch]:
         """Reuse authentication; verify with a fresh, correlated state query.
 
-        Notifications and SET status alone are never proof of the new state.
+        SET status alone is never proof of the new state. Auto can be
+        confirmed by the selected-mode notification when the query reports
+        the concrete intensity chosen by the adaptive mode.
         The caller discards a failed transaction's session before recovery.
         """
         self._require_connected()
@@ -203,9 +205,13 @@ class OpoSession:
         timer = PhaseTimer()
         events: list[SafeEvent] = []
         ignored = 0
+        selected_notification: AncState | None = None
 
         def collect(frames: list[Frame]) -> None:
-            nonlocal ignored
+            nonlocal ignored, selected_notification
+            for frame in frames:
+                if frame.command == NOTIFY_STATE and frame.payload[:3] == b"\x03\x01\x01":
+                    selected_notification = parse_anc_state(frame, self.profile.anc)
             batch = self._redact(frames)
             events.extend(batch.events)
             # Keep memory bounded even if the peer floods notifications.
@@ -221,11 +227,19 @@ class OpoSession:
                 )
             except TimeoutError:
                 # Some firmware omits SET acknowledgement. Never replay SET;
-                # a fresh query is still the only success criterion.
+                # verification still needs independent device state.
                 acknowledgement = None
             timer.mark("set_response")
             expected_mode = mode if mode in ("off", "transparency", "on") else "on"
             expected_level = None if mode in ("off", "transparency", "on") else mode
+
+            def confirmed_auto() -> AncState | None:
+                if (mode == "auto" and selected_notification is not None
+                        and selected_notification.mode == "on"
+                        and selected_notification.level == "auto"):
+                    return selected_notification
+                return None
+
             # SET acknowledgement can precede physical application. A first
             # fresh query may legitimately return the previous mode. Re-query
             # on each response, bounded by both time and count; never replay SET.
@@ -235,14 +249,24 @@ class OpoSession:
                 remaining = deadline - monotonic()
                 if remaining <= 0:
                     break
-                state = self._transport.request(
-                    QUERY_ANC, b"\x01\x01", RESPONSE_ANC, on_frames=collect,
-                    timeout=remaining,
-                )
+                try:
+                    state = self._transport.request(
+                        QUERY_ANC, b"\x01\x01", RESPONSE_ANC, on_frames=collect,
+                        timeout=remaining,
+                    )
+                except TimeoutError:
+                    observed = confirmed_auto()
+                    if observed is None:
+                        raise
+                    break
                 observed = parse_anc_state(state, self.profile.anc) if state.payload[:1] == b"\x00" else None
                 if observed is not None and observed.mode == expected_mode and (
                     expected_level is None or observed.level == expected_level
                 ):
+                    break
+                adaptive = confirmed_auto()
+                if adaptive is not None:
+                    observed = adaptive
                     break
             else:
                 observed = None
@@ -250,22 +274,10 @@ class OpoSession:
             if observed is None or observed.mode != expected_mode or (
                 expected_level is not None and observed.level != expected_level
             ):
-                # Some devices answer with the intensity they actually
-                # applied instead of the requested mode. The pushed mode
-                # notification is the independent proof in that case.
-                notified = next(
-                    (event for event in events
-                     if event.kind == "anc" and event.data.get("level") == expected_level),
-                    None,
-                )
-                if notified is None:
+                observed = confirmed_auto()
+                if observed is None:
                     raise RuntimeError(
                         "ANC verification failed: fresh state did not match request")
-                observed = AncState(
-                    mode=expected_mode,
-                    level=expected_level,
-                    index=self.profile.anc.write_indices.get(expected_level, 0),
-                )
             timer.elapsed("verified_elapsed")
             result = ControlResult(
                 name=self.device.name, product_id=self.profile.product_id,

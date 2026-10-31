@@ -133,9 +133,11 @@ until verified; an acknowledgement alone never produces a success message.
 
 Wear the earbuds for ANC tests: devices in their case may reject changes. Main
 ANC On may choose a device-dependent strength; select a specific strength if you
-need one. Cold setup and explicit strengths still take several seconds. Warm main
-mode changes reuse the authenticated session; recorded timings are in
-[the measurement notes](docs/measurements/anc-baseline.md).
+need one. Cold setup still takes several seconds. Warm mode and strength changes
+reuse the authenticated session. The Nord Buds 3 Pro's Low/Moderate/High/Auto
+selection was observed in the frontend after 0.15–0.30 seconds; see the
+[device measurements](docs/devices/oneplus-nord-buds-3-pro.md#anc-latency-correction-2026-10-31)
+and [reference-model timing notes](docs/measurements/anc-baseline.md).
 Native EQ controls live only in the opened panel. Both models show verified
 factory presets; Pro 2 also shows controls generated from its returned custom-band
 definition. Changes are written to the earbuds and persist independently of the

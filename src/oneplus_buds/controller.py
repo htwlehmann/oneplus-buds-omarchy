@@ -88,7 +88,7 @@ class BudsController:
         timings: dict[str, float] = {}
         with self._lock:
             timer.mark("controller_lock_wait")
-            if self.reuse_session and self._running and mode in ("on", "off", "transparency"):
+            if self.reuse_session and self._running:
                 return self._set_session_anc(mode, timer)
             try:
                 self._close_session()
