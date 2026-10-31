@@ -74,7 +74,7 @@ class NordBuds3ProProfileTests(unittest.TestCase):
         self.assertEqual([preset.eq_id for preset in eq.presets], [3, 4, 5])
         self.assertEqual(
             [preset.name for preset in eq.presets],
-            ["Ausgewogen (Standard)", "Serenade", "Bass"],
+            ["Balanced (Default)", "Serenade", "Bass"],
         )
         self.assertTrue(eq.write_verified)
         self.assertTrue(eq.supports_custom)

@@ -1056,51 +1056,64 @@ BarWidget {
               visible: root.featureList.length > 0
             }
 
-            Repeater {
-              model: root.featureList
+            Grid {
+              id: featureGrid
+              width: parent.width
+              columns: root.useTwoColumnLayout ? 2 : 1
+              rows: root.useTwoColumnLayout
+                ? Math.ceil(root.featureList.length / 2) : root.featureList.length
+              flow: Grid.TopToBottom
+              columnSpacing: Style.space(16)
+              rowSpacing: Style.space(5)
 
-              delegate: Row {
-                required property var modelData
-                objectName: "featureRow_" + modelData.name
-                readonly property string tooltipText: modelData.tooltip || ""
-                width: featuresColumn.width
-                spacing: Style.space(8)
-                HoverHandler { id: featureHover }
-                Controls.ToolTip {
-                  visible: featureHover.hovered && parent.tooltipText !== ""
-                  text: parent.tooltipText
-                  delay: 400
-                  width: Math.min(implicitWidth, parent.width)
-                  font.family: root.bar.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  palette.toolTipBase: root.bar.background
-                  palette.toolTipText: root.bar.foreground
-                  palette.dark: Color.accent
-                }
+              Repeater {
+                model: root.featureList
 
-                Text {
-                  width: parent.width - Style.space(56)
-                  text: modelData.label + (modelData.writable ? "" : "  (read-only)")
-                  textFormat: Text.PlainText
-                  color: root.bar.foreground
-                  font.family: root.bar.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  elide: Text.ElideRight
-                  opacity: modelData.writable ? 1.0 : 0.6
-                }
+                delegate: Row {
+                  required property var modelData
+                  objectName: "featureRow_" + modelData.name
+                  readonly property string tooltipText: modelData.tooltip || ""
+                  width: root.useTwoColumnLayout
+                    ? (featureGrid.width - featureGrid.columnSpacing) / 2 : featureGrid.width
+                  spacing: Style.space(8)
+                  HoverHandler { id: featureHover }
+                  Controls.ToolTip {
+                    visible: featureHover.hovered && parent.tooltipText !== ""
+                    text: parent.tooltipText
+                    delay: 400
+                    width: Math.min(implicitWidth, parent.width)
+                    font.family: root.bar.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    palette.toolTipBase: root.bar.background
+                    palette.toolTipText: root.bar.foreground
+                    palette.dark: Color.accent
+                  }
 
-                ToggleSwitch {
-                  objectName: "featureToggle_" + modelData.name
-                  width: Style.space(40)
-                  checked: modelData.enabled
-                  busy: root.pendingRequestId >= 0
-                  // Local fork: switches that are not verified for this model
-                  // stay visible but cannot be written.
-                  interactive: modelData.writable
-                  enabled: modelData.writable && root.connection === "connected"
-                    && root.pendingRequestId < 0
-                  opacity: modelData.writable ? 1.0 : 0.6
-                  onToggled: root.toggleFeature(modelData.name, !modelData.enabled)
+                  Text {
+                    width: parent.width - Style.space(56)
+                    text: modelData.label + (modelData.writable ? "" : "  (read-only)")
+                    textFormat: Text.PlainText
+                    color: root.bar.foreground
+                    font.family: root.bar.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    wrapMode: Text.Wrap
+                    anchors.verticalCenter: parent.verticalCenter
+                    opacity: modelData.writable ? 1.0 : 0.6
+                  }
+
+                  ToggleSwitch {
+                    objectName: "featureToggle_" + modelData.name
+                    width: Style.space(40)
+                    checked: modelData.enabled
+                    busy: root.pendingRequestId >= 0
+                    // Local fork: switches that are not verified for this model
+                    // stay visible but cannot be written.
+                    interactive: modelData.writable
+                    enabled: modelData.writable && root.connection === "connected"
+                      && root.pendingRequestId < 0
+                    opacity: modelData.writable ? 1.0 : 0.6
+                    onToggled: root.toggleFeature(modelData.name, !modelData.enabled)
+                  }
                 }
               }
             }

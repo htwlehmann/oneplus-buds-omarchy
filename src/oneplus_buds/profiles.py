@@ -74,7 +74,7 @@ PRO_2_EQ_PRESETS = (
 #   id 3 = Ausgewogen (Standard), id 4 = Serenade, id 5 = Bass
 # The device accepts the other IDs as well but the app does not offer them.
 NORD_BUDS_3_PRO_EQ_PRESETS = (
-    EqPresetProfile(3, "balanced", "Ausgewogen (Standard)", ("ausgewogen", "balanced")),
+    EqPresetProfile(3, "balanced", "Balanced (Default)", ("ausgewogen", "balanced")),
     EqPresetProfile(4, "serenade", "Serenade", ("serenad",)),
     EqPresetProfile(5, "bass", "Bass", ("bass-boost",)),
 )
