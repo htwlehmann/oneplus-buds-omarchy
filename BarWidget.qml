@@ -183,13 +183,11 @@ BarWidget {
     if (!eqStatus || !customEqEntries.length) return
     for (var i = 0; i < customEqEntries.length; i++) {
       if (customEqEntries[i].eq_id === eqStatus.current_id) {
-        customSlotIndex = i
-        applyCustomSlotIndex()
+        setCustomSlotIndex(i)
         return
       }
     }
-    customSlotIndex = 0
-    applyCustomSlotIndex()
+    setCustomSlotIndex(0)
   }
 
   // The dropdown control writes its own currentIndex when the user picks an
@@ -202,10 +200,14 @@ BarWidget {
       customEqSelector.currentIndex = index
   }
 
-  function selectCustomSlot(index) {
-    if (index < 0 || index >= customEqEntries.length) return
+  function setCustomSlotIndex(index) {
     customSlotIndex = index
     applyCustomSlotIndex()
+  }
+
+  function selectCustomSlot(index) {
+    if (index < 0 || index >= customEqEntries.length) return
+    setCustomSlotIndex(index)
     customSelectionDirty = true
   }
 
@@ -682,7 +684,7 @@ BarWidget {
       var createdId = response.result ? Number(response.result.current_id) : -1
       for (var i = 0; i < customEqEntries.length; i++) {
         if (customEqEntries[i].eq_id === createdId) {
-          customSlotIndex = i
+          setCustomSlotIndex(i)
           customSelectionDirty = true
           break
         }

@@ -779,27 +779,38 @@ TestCase {
   compare(service.profileRequests[0].action, "create")
   compare(service.profileRequests[0].name, "Plugin Test")
   compare(widget.pendingKind, "custom_eq_create")
+  // The bridge publishes the new profile before the answer arrives.
+  service.snapshot.eq.custom_entries.push({eq_id:8,name:"Plugin Test",
+   min_gain_db:-6,max_gain_db:6,
+   bands:[{frequency_hz:62,gain_db:0},{frequency_hz:250,gain_db:0}]})
+  service.snapshot = JSON.parse(JSON.stringify(service.snapshot))
+  wait(0)
   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
    result:{verified:true,current_id:8}}
   wait(0)
   compare(widget.profileNameMode, "")
   verify(selector.visible && !field.visible)
   verify(widget.outcome.indexOf("Verified") !== -1)
+  // The dropdown shows the profile that was just created.
+  compare(widget.selectedCustom.eq_id, 8)
+  compare(selector.currentIndex, widget.customSlotIndex)
 
   first.clicked()
   wait(0)
   compare(widget.profileNameMode, "rename")
-  compare(widget.profileNameDraft, "Test eq")
+  // The rename starts from the profile that is selected, which is the one
+  // that was just created.
+  compare(widget.profileNameDraft, "Plugin Test")
   widget.profileNameDraft = "Rock"
   second.clicked()
   wait(0)
   compare(service.profileRequests.length, 2)
   compare(service.profileRequests[1].action, "rename")
-  compare(service.profileRequests[1].entry_id, 7)
+  compare(service.profileRequests[1].entry_id, 8)
   compare(service.profileRequests[1].name, "Rock")
   compare(widget.pendingKind, "custom_eq_rename")
   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
-   result:{verified:true,current_id:7}}
+   result:{verified:true,current_id:8}}
   wait(0)
   compare(widget.profileNameMode, "")
 
