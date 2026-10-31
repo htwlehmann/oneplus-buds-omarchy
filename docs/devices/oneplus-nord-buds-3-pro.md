@@ -175,9 +175,9 @@ The panel now offers only these audited entries:
 | Personalised noise cancellation | `0c` | verified writes |
 | BassWave | `1d` | verified writes |
 | Auto play/pause | `04` | verified on/off writes |
-| Camera control | `0d` | read-only; camera integration depends on the phone |
-| Dual connection | `11` | read-only |
-| Hi-Res mode | `18` | read-only; codec/host support remains relevant |
+| Camera control | `0d` | verified on/off writes; camera integration depends on the phone |
+| Dual connection | `11` | verified on/off writes |
+| Hi-Res mode | `18` | verified on/off writes; codec/host support remains relevant |
 
 `wearDetection=1` selects **Auto play/pause**, not the app's other label,
 “In-ear detection”. **Camera control** and **Hi-Res mode** are resource titles
@@ -188,6 +188,32 @@ original enabled state. See [measurement](../measurements/2026-10-31-nord-auto-p
 Hovering its row explains removal to pause and reinsertion to resume. Actual
 media-player behavior was not tested. Feature writes now parse8403, require
 status00 and matching explicit readback; absent state cannot confirm off.
+
+Camera, Dual connection and Hi-Res were subsequently enabled at the owner's
+request too. App setters use P0(13/17/24,boolean,address), then0403[id,bool].
+Each was tested both ways with ACK00 and independent reads: camera~0.66s,
+dual~0.66s, Hi-Res~0.45s (includes the additional verification query). Original
+camera/dual=on and Hi-Res=off were restored. A delayed reset followed Hi-Res
+off; the next read failed transiently. Two settled full reads confirmed all
+original values on a connected session. See
+[measurement](../measurements/2026-10-31-nord-remaining-features.json).
+
+Both Hi-Res directions may disconnect/reconnect according to the app resources.
+For connection-changing11/18, the controller attempts one recovery to the
+captured address and product, then reads the setting without replaying the
+write. A matching value from the same pair can confirm the stored setting even
+if the original ACK was lost. Explicit rejection stops immediately; it cannot
+be converted into success by recovery. Wrong identity, missing readback or
+failed recovery stay unverified. Later resets use normal service recovery.
+
+The three row tooltips explain compatible phone camera operation, two-device
+connection, and high-resolution host support with possible reconnection.
+A setting readback does not establish actual Linux camera integration, codec
+resolution or simultaneous media behavior. The existing Verified feedback stays.
+REA exports in the research folder: rea-camera-dual-controls-2026-10-31-evidence.json
+and rea-hires-controls-2026-10-31-evidence.json. Hi-Res setter Evidence:
+ev_54dbaf2014c0eeb4317908aa25d9a05e121e39ca0a8ff03bd2cb8e23c4bed6db.
+
 
 Hidden entries:
 

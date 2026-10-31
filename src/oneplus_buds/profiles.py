@@ -90,10 +90,8 @@ class DeviceProfile:
     capabilities: frozenset[str]
     compatibility: CompatibilityState
     # Feature switches that may be written from the plugin. A switch that is
-    # not listed stays read-only. Switching the audio codec from the control
-    # channel makes the earbuds reset their Bluetooth link, which cost the
-    # owner an audio connection and a crashed phone app, so that switch is
-    # deliberately not writable here.
+    # not listed stays read-only. Connection-changing switches need recovery
+    # and a fresh read; an uncertain write must never be replayed.
     writable_features: frozenset[str] = frozenset()
     # Wire action -> allowed function IDs. Empty means no touch writes.
     touch_functions: dict[int, tuple[int, ...]] = field(default_factory=dict)
@@ -218,13 +216,15 @@ PROFILES = {
         ),
         # Verified on the owner's hardware: writing these switches changed the
         # device state and a fresh read confirmed it. Everything else stays
-        # read-only until it has been tested the same way. "high_quality_audio"
-        # is left out on purpose: it renegotiates the audio codec and resets
-        # the Bluetooth link of the earbuds.
+        # read-only until it has been tested the same way. Hi-Res may reset
+        # the Bluetooth link; the controller recovers without replaying writes.
         writable_features=frozenset({
             "bass_engine",
             "personal_noise",
             "wear_detection",
+            "click_to_take_photo",
+            "multipoint",
+            "high_quality_audio",
         }),
         # Wireless Earphones 17.6.6, whitelist 064414, plus the owner's
         # 0100 capability reply 00 ff 27 52 ee c7 14. Golden Sound (bit19)

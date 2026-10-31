@@ -388,8 +388,21 @@ class BudsController:
                 raise ValueError(
                     f"the {name} switch is read-only for this device model"
                 )
-            status, verified = cast(OpoSession, self._session).set_feature_switch(
-                feature_id, enabled)
+            intended_address = self._status.device.address
+            intended_product = self._status.product_id
+            connection_changing = name in ("multipoint", "high_quality_audio")
+            recover = False
+            try:
+                status, verified = cast(OpoSession, self._session).set_feature_switch(
+                    feature_id, enabled)
+                recover = connection_changing and status is None
+            except (OSError, RuntimeError):
+                if not connection_changing:
+                    raise
+                status, verified, recover = None, False, True
+            if recover:
+                verified = self._recover_feature_switch(
+                    feature_id, enabled, name, intended_address, intended_product)
             if verified:
                 self._feature_switches[name] = enabled
             self._generation += 1
@@ -400,6 +413,32 @@ class BudsController:
                 "verified": verified,
                 "set_status": status,
             }
+
+    def _recover_feature_switch(self, feature_id: int, enabled: bool, name: str,
+                                address: str, product_id: str | None) -> bool:
+        """Read a connection-changing setting once on the same pair; never resend it."""
+        self._close_session()
+        self._feature_switches.pop(name, None)
+        self._reconnect_count += 1
+        try:
+            session, status, batch = self.backend.start_session(address)
+            if (status.device.address.upper() != address.upper()
+                    or status.product_id != product_id):
+                session.__exit__(None, None, None)
+                return False
+            self._session, self._status = session, status
+            self.address = status.device.address
+            self._update_battery(status.battery)
+            self._advertised_event_codes = session.advertised_event_codes
+            self._apply_batch(batch)
+            self._last_state_refresh = 0.0
+            observed = session.feature_switches((feature_id,)).get(feature_id)
+            if isinstance(observed, bool):
+                self._feature_switches[name] = observed
+            return observed is enabled
+        except (OSError, RuntimeError, ValueError):
+            self._close_session()
+            return False
 
     def find_earbuds(self, ringing: bool = True, *, device_id: str | None = None) -> dict[str, object]:
         """Track confirmed/uncertain sound state for the selected physical pair."""

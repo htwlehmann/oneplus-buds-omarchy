@@ -141,7 +141,10 @@ var FEATURE_ORDER = [
 ]
 
 var FEATURE_TOOLTIPS = {
-  wear_detection: "Remove either earbud to pause playback; put it back in to resume."
+  wear_detection: "Remove either earbud to pause playback; put it back in to resume.",
+  click_to_take_photo: "Double-tap either earbud to take a photo in a compatible phone camera app.",
+  multipoint: "Connect to two devices at the same time and switch between them. Turning this off may disconnect one device.",
+  high_quality_audio: "Enable high-resolution audio with a compatible audio host. Changing this mode may briefly disconnect and reconnect the earbuds."
 }
 
 function featureList(snapshot) {

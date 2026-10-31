@@ -590,6 +590,8 @@ class OpoSession:
                       and acknowledgement.payload else None)
         except TimeoutError:
             status = None
+        if status is not None and status != 0:
+            return status, False
         verified = self.feature_switches((feature_id,)).get(feature_id)
         return status, status == 0 and verified is enabled
 

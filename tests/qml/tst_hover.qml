@@ -151,6 +151,43 @@ TestCase {
   service.connection = "disconnected"
   verify(!toggle.enabled)
  }
+ function test_remaining_feature_controls_data() {
+  return [{tag:"camera",name:"click_to_take_photo",label:"Camera control",keyword:"camera"},
+   {tag:"dual",name:"multipoint",label:"Dual connection",keyword:"two devices"},
+   {tag:"hires",name:"high_quality_audio",label:"Hi-Res mode",keyword:"disconnect"}]
+ }
+ function test_remaining_feature_controls(data) {
+  var state = findSnapshot("stopped")
+  state.capabilities = ["feature_switches"]
+  state.feature_switches = {}; state.feature_switches[data.name] = false
+  state.feature_labels = {}; state.feature_labels[data.name] = data.label
+  state.writable_features = [data.name]
+  service.snapshot = state
+  widget.popupOpen = true
+  while (widget.pendingRequestId >= 0)
+   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  wait(0)
+  var row = findChild(widget,"featureRow_" + data.name)
+  verify(row.tooltipText.indexOf(data.keyword) !== -1)
+  for (var i = 0; i < 2; ++i) {
+   var target = i === 0
+   var toggle = findChild(widget,"featureToggle_" + data.name)
+   verify(toggle.enabled && toggle.interactive)
+   compare(toggle.checked,!target)
+   toggle.toggled()
+   verify(!toggle.enabled)
+   compare(toggle.checked,!target)
+   compare(service.featureRequests[i],{feature:data.name,enabled:target})
+   var confirmed = JSON.parse(JSON.stringify(state))
+   confirmed.feature_switches[data.name] = target
+   service.snapshot = confirmed
+   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:true,set_status:0}}
+   wait(0)
+   toggle = findChild(widget,"featureToggle_" + data.name)
+   verify(toggle.enabled)
+   compare(toggle.checked,target)
+  }
+ }
  function test_find_play_stop_follow_confirmed_state_and_handle_rejection() {
   service.snapshot = findSnapshot("stopped")
   widget.popupOpen = true
