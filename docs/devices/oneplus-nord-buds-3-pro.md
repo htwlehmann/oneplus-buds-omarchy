@@ -174,14 +174,20 @@ The panel now offers only these audited entries:
 |---|---:|---|
 | Personalised noise cancellation | `0c` | verified writes |
 | BassWave | `1d` | verified writes |
-| Auto play/pause | `04` | read-only |
+| Auto play/pause | `04` | verified on/off writes |
 | Camera control | `0d` | read-only; camera integration depends on the phone |
 | Dual connection | `11` | read-only |
 | Hi-Res mode | `18` | read-only; codec/host support remains relevant |
 
 `wearDetection=1` selects **Auto play/pause**, not the app's other label,
 “In-ear detection”. **Camera control** and **Hi-Res mode** are resource titles
-from this app build. No new switch writes were enabled or tested.
+from this app build. The audit initially left these switches read-only.
+Auto play/pause was subsequently enabled at the owner's request and tested
+off/on with ACK00 plus independent readback (~0.3s each), restoring its
+original enabled state. See [measurement](../measurements/2026-10-31-nord-auto-play-pause.json).
+Hovering its row explains removal to pause and reinsertion to resume. Actual
+media-player behavior was not tested. Feature writes now parse8403, require
+status00 and matching explicit readback; absent state cannot confirm off.
 
 Hidden entries:
 

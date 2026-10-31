@@ -20,6 +20,11 @@ TestCase {
   property var findRequests: []
   property var findDeviceIds: []
   property var queuedRequests: []
+  property var featureRequests: []
+  function setFeatureSwitch(feature, enabled) {
+   featureRequests = featureRequests.concat([{feature:feature, enabled:enabled}])
+   return nextId++
+  }
   function request(command, params) {
    queuedRequests = queuedRequests.concat([{command:command, parameters:params}])
    if (command === "eq_status") return eqStatus()
@@ -87,6 +92,7 @@ TestCase {
   service.findRequests = []
   service.findDeviceIds = []
   service.queuedRequests = []
+  service.featureRequests = []
   widget.panelQueue = []
   host.panelAvailableWidth = 600
   widget.popupOpen = false
@@ -109,6 +115,41 @@ TestCase {
   return {status:{model:"Nord",battery:{}},anc_modes:[],
    capabilities:["find_earbuds"],session_connected:true,compatibility:"verified",
    find_state:state,find_device_id:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+ }
+ function test_auto_play_pause_waits_for_readback_and_explains_function_on_hover() {
+  var state = findSnapshot("stopped")
+  state.capabilities = ["feature_switches"]
+  state.feature_switches = {wear_detection:false, high_quality_audio:false}
+  state.feature_labels = {wear_detection:"Auto play/pause", high_quality_audio:"Hi-Res mode"}
+  state.writable_features = ["wear_detection"]
+  service.snapshot = state
+  widget.popupOpen = true
+  while (widget.pendingRequestId >= 0)
+   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  wait(0)
+  var toggle = findChild(widget, "featureToggle_wear_detection")
+  verify(toggle !== null)
+  verify(toggle.enabled && toggle.interactive && !toggle.checked)
+  var row = findChild(widget, "featureRow_wear_detection")
+  verify(row.tooltipText.indexOf("pause") !== -1 && row.tooltipText.indexOf("resume") !== -1)
+  toggle.toggled()
+  compare(service.featureRequests, [{feature:"wear_detection",enabled:true}])
+  verify(!toggle.checked && !toggle.enabled)
+  var confirmed = JSON.parse(JSON.stringify(state))
+  confirmed.feature_switches.wear_detection = true
+  service.snapshot = confirmed
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:true,set_status:0}}
+  wait(0)
+  toggle = findChild(widget, "featureToggle_wear_detection")
+  verify(toggle.checked && toggle.enabled)
+  toggle.toggled()
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:false,set_status:14}}
+  wait(0)
+  verify(toggle.checked)
+  verify(widget.outcome.indexOf("not confirmed") !== -1)
+  verify(!findChild(widget, "featureToggle_high_quality_audio").enabled)
+  service.connection = "disconnected"
+  verify(!toggle.enabled)
  }
  function test_find_play_stop_follow_confirmed_state_and_handle_rejection() {
   service.snapshot = findSnapshot("stopped")

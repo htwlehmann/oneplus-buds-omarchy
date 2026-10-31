@@ -71,7 +71,7 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(payload["feature_labels"]["wear_detection"], "Auto play/pause")
         self.assertEqual(payload["feature_labels"]["click_to_take_photo"], "Camera control")
         self.assertEqual(payload["feature_labels"]["high_quality_audio"], "Hi-Res mode")
-        self.assertEqual(payload["writable_features"], ["bass_engine", "personal_noise"])
+        self.assertEqual(payload["writable_features"], ["bass_engine", "personal_noise", "wear_detection"])
 
     def test_snapshot_serialization_is_json_compatible_and_address_free(self):
         payload = serialize_snapshot(SNAPSHOT)

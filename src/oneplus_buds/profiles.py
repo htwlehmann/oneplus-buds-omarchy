@@ -224,6 +224,7 @@ PROFILES = {
         writable_features=frozenset({
             "bass_engine",
             "personal_noise",
+            "wear_detection",
         }),
         # Wireless Earphones 17.6.6, whitelist 064414, plus the owner's
         # 0100 capability reply 00 ff 27 52 ee c7 14. Golden Sound (bit19)

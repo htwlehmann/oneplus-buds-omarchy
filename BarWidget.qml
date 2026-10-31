@@ -526,6 +526,8 @@ BarWidget {
         outcome = "Hold cycle was not confirmed by earbuds"
       } else if (completedKind === "touch_write" && (!response.result || response.result.verified !== true)) {
         outcome = "Touch assignment was not confirmed by earbuds"
+      } else if (completedKind === "feature" && (!response.result || response.result.verified !== true)) {
+        outcome = "Switch change was not confirmed by earbuds"
       } else if (response.result && response.result.verified === true) {
         outcome = "Verified on earbuds"
       } else if (completedKind === "bass") {
@@ -1059,8 +1061,22 @@ BarWidget {
 
               delegate: Row {
                 required property var modelData
+                objectName: "featureRow_" + modelData.name
+                readonly property string tooltipText: modelData.tooltip || ""
                 width: featuresColumn.width
                 spacing: Style.space(8)
+                HoverHandler { id: featureHover }
+                Controls.ToolTip {
+                  visible: featureHover.hovered && parent.tooltipText !== ""
+                  text: parent.tooltipText
+                  delay: 400
+                  width: Math.min(implicitWidth, parent.width)
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  palette.toolTipBase: root.bar.background
+                  palette.toolTipText: root.bar.foreground
+                  palette.dark: Color.accent
+                }
 
                 Text {
                   width: parent.width - Style.space(56)
@@ -1074,6 +1090,7 @@ BarWidget {
                 }
 
                 ToggleSwitch {
+                  objectName: "featureToggle_" + modelData.name
                   width: Style.space(40)
                   checked: modelData.enabled
                   busy: root.pendingRequestId >= 0

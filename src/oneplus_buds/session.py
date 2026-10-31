@@ -585,11 +585,13 @@ class OpoSession:
             acknowledgement = self._transport.request(
                 SET_FEATURE_SWITCH, payload, RESPONSE_SET_FEATURE_SWITCH,
             )
-            status = parse_set_anc_status(acknowledgement)
+            status = (acknowledgement.payload[0]
+                      if acknowledgement.command == RESPONSE_SET_FEATURE_SWITCH
+                      and acknowledgement.payload else None)
         except TimeoutError:
             status = None
         verified = self.feature_switches((feature_id,)).get(feature_id)
-        return status, bool(verified) == bool(enabled)
+        return status, status == 0 and verified is enabled
 
     def find_earbuds(self, ringing: bool = True) -> tuple[int | None, bool]:
         """Start or stop the find-my-earbuds tone."""

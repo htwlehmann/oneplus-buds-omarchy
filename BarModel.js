@@ -140,6 +140,10 @@ var FEATURE_ORDER = [
   "collect_logs"
 ]
 
+var FEATURE_TOOLTIPS = {
+  wear_detection: "Remove either earbud to pause playback; put it back in to resume."
+}
+
 function featureList(snapshot) {
   var switches = snapshot && snapshot.feature_switches
   if (!switches || typeof switches !== "object") return []
@@ -152,6 +156,7 @@ function featureList(snapshot) {
     if (labels && typeof labels[name] !== "string") continue
     if (typeof switches[name] === "boolean")
       result.push({ name: name, label: (labels && labels[name]) || FEATURE_LABELS[name] || titleCase(name),
+        tooltip: FEATURE_TOOLTIPS[name] || "",
         enabled: switches[name],
         writable: writable.indexOf(name) !== -1 })
   }

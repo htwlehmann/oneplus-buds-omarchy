@@ -236,6 +236,7 @@ class BudsFrontendBridge:
                         "set_feature_switch parameter 'enabled' must be a boolean"
                     )
                 result = self.controller.set_feature_switch(feature, enabled)
+                self._on_snapshot(self.controller.snapshot())
             elif command == "find_earbuds":
                 # Local fork: ring the earbuds to locate them.
                 self._require_parameters(command, params,
