@@ -125,6 +125,12 @@ Item {
     return request("rename_custom_eq", params)
   }
 
+  function deleteCustomEq(entryId, deviceId) {
+    var params = { entry_id: Number(entryId) }
+    if (deviceId) params.device_id = String(deviceId)
+    return request("delete_custom_eq", params)
+  }
+
   function saveDiagnosticReport(path) {
     return request("save_diagnostic_report", { path: String(path || "") })
   }

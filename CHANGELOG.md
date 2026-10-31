@@ -14,6 +14,15 @@
   keyboard while it is open. The old xdg-popup never delivered key events to
   the name field, which made the new profile name impossible to type and the
   profile impossible to create. The device rename field benefits as well.
+- Respect the three custom EQ slots the earbuds provide: the plugin uses the
+  first free id of the measured range, greys out the plus button with the hint
+  "All custom EQ slots are in use" and refuses the create with a clear
+  message instead of sending a write the device rejects.
+- Add a trash button for the selected custom profile with a confirmation
+  dialog, so a slot can be freed for a new profile.
+- Keep the name of the selected profile in the profile dropdown: the control
+  drops the index binding when the user picks an entry, so the index is now
+  set explicitly.
 
 - Add an app-like Play/Stop earbud search control with correct `0x8400`
   acknowledgement handling, shared uncertain/confirmed state, per-device

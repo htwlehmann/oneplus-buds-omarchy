@@ -47,6 +47,9 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         "custom_eq_write_verified": bool(
             profile and profile.verified and profile.eq and profile.eq.custom_write_verified
         ),
+        "custom_eq_max": profile.eq.custom_max if profile and profile.eq else None,
+        "custom_eq_slots": len(snapshot.eq_status.custom_entries)
+        if snapshot.eq_status else 0,
         "writable_features": sorted(profile.writable_features) if profile else [],
         "feature_labels": dict(profile.feature_labels)
         if profile and profile.feature_labels is not None else None,

@@ -58,6 +58,11 @@ TestCase {
      name:name, device_id:deviceId || ""}])
    return nextId++
   }
+  function deleteCustomEq(entryId, deviceId) {
+   profileRequests = profileRequests.concat([{action:"delete", entry_id:entryId,
+     device_id:deviceId || ""}])
+   return nextId++
+  }
   function saveDiagnosticReport(path) { reportRequests++; reportPath = path; return nextId++ }
  }
  QtObject {
@@ -748,8 +753,9 @@ TestCase {
   verify(selector.visible && !field.visible)
   verify(selector.width < row.width)
   verify(first.x > selector.x + selector.width)
-  compare(second.x + second.width, row.width)
-  compare(first.text, "\u270e")
+  var deleteButton = findChild(widget, "customEqDeleteAction")
+  compare(deleteButton.x + deleteButton.width, row.width)
+  compare(first.text, "\uF040")
   compare(second.text, "+")
 
   second.clicked()
@@ -804,5 +810,75 @@ TestCase {
   wait(0)
   compare(widget.profileNameMode, "")
   compare(service.profileRequests.length, 2)
+ }
+
+ function test_custom_eq_dropdown_keeps_the_selection_and_delete_asks_first() {
+  var state = {status:{model:"Nord",battery:{}}, anc_modes:[], capabilities:["eq"],
+   session_connected:true, eq_write_verified:true, custom_eq_write_verified:true,
+   custom_eq_max:3, custom_eq_slots:2,
+   eq:{current_id:7,current_name:"Test eq",gain_step_db:1,presets:[],
+    custom_entries:[{eq_id:7,name:"Test eq",min_gain_db:-6,max_gain_db:6,
+     bands:[{frequency_hz:62,gain_db:3},{frequency_hz:250,gain_db:1}]},
+     {eq_id:8,name:"Second",min_gain_db:-6,max_gain_db:6,
+     bands:[{frequency_hz:62,gain_db:0},{frequency_hz:250,gain_db:0}]}]}}
+  service.snapshot = state
+  widget.popupOpen = true
+  while (widget.pendingRequestId >= 0)
+   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{}}
+  wait(0)
+  widget.customEqExpanded = true
+  wait(0)
+  var selector = findChild(widget, "customEqSelector")
+  var plus = findChild(widget, "customEqSecondAction")
+  var trash = findChild(widget, "customEqDeleteAction")
+  var hint = findChild(widget, "customEqSlotsHint")
+  var rename = findChild(widget, "customEqFirstAction")
+  verify(selector !== null && plus !== null && trash !== null)
+  verify(plus.enabled)
+  verify(!hint.visible)
+  // The trash button sits at the far right, after the pencil and the plus.
+  compare(trash.text, "\uF1F8")
+  verify(rename.x < plus.x)
+  verify(plus.x < trash.x)
+  verify(trash.x + trash.width <= selector.x + selector.width + selector.width)
+
+  // The chosen name must survive the model rebuild of the next snapshot.
+  widget.selectCustomSlot(1)
+  compare(selector.currentIndex, 1)
+  service.snapshot = JSON.parse(JSON.stringify(state))
+  wait(0)
+  compare(selector.currentIndex, 1)
+  compare(selector.currentText, "Second")
+
+  // Deleting asks for confirmation first.
+  var queuedBefore = service.queuedRequests.length
+  trash.clicked()
+  wait(0)
+  verify(widget.deleteConfirmOpen)
+  compare(service.queuedRequests.length, queuedBefore)
+  widget.cancelDeleteCustomProfile()
+  wait(0)
+  verify(!widget.deleteConfirmOpen)
+  compare(service.queuedRequests.length, queuedBefore)
+
+  trash.clicked()
+  wait(0)
+  widget.confirmDeleteCustomProfile()
+  wait(0)
+  compare(service.queuedRequests.length, queuedBefore)
+  var deleteRequest = service.profileRequests[service.profileRequests.length - 1]
+  compare(deleteRequest.action, "delete")
+  compare(deleteRequest.entry_id, 8)
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{verified:true,current_id:8}}
+  wait(0)
+  verify(!widget.deleteConfirmOpen)
+
+  // With every slot in use the plus button is greyed out.
+  state.custom_eq_slots = 3
+  service.snapshot = JSON.parse(JSON.stringify(state))
+  wait(0)
+  verify(!plus.enabled)
+  verify(hint.visible)
  }
 }

@@ -113,6 +113,49 @@ class EqProfileSessionTests(unittest.TestCase):
             session.create_custom_eq("Plugin Test")
         self.assertEqual(self.detail_payloads(session), [])
 
+    def test_create_uses_the_first_free_slot_of_the_measured_range(self):
+        session = self.session()
+        session._transport.request.side_effect = [
+            Frame(RESPONSE_EQ, 1, b"\x00\x07"),
+            Frame(RESPONSE_EQ_ALL, 2, CATALOGUE_78),
+            Frame(RESPONSE_SET_EQ_DETAIL, 3, b"\x00"),
+            Frame(RESPONSE_EQ_ALL, 4, CATALOGUE_789),
+            Frame(RESPONSE_EQ, 5, b"\x00\x07"),
+            Frame(RESPONSE_EQ, 6, b"\x00\x07"),
+            Frame(RESPONSE_EQ_ALL, 7, CATALOGUE_789),
+        ]
+        session.create_custom_eq("Plugin Test")
+        payloads = self.detail_payloads(session)
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0][3], 9)
+
+    def test_create_reuses_a_freed_low_slot(self):
+        session = self.session()
+        session._transport.request.side_effect = [
+            Frame(RESPONSE_EQ, 1, b"\x00\x08"),
+            Frame(RESPONSE_EQ_ALL, 2, catalogue(ENTRY_8)),
+            Frame(RESPONSE_SET_EQ_DETAIL, 3, b"\x00"),
+            Frame(RESPONSE_EQ_ALL, 4, catalogue(ENTRY_7, ENTRY_8)),
+            Frame(RESPONSE_EQ, 5, b"\x00\x08"),
+            Frame(RESPONSE_EQ, 6, b"\x00\x08"),
+            Frame(RESPONSE_EQ_ALL, 7, catalogue(ENTRY_7, ENTRY_8)),
+        ]
+        session.create_custom_eq("Plugin Test")
+        payloads = self.detail_payloads(session)
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0][3], 7)
+
+    def test_create_is_refused_when_every_slot_is_taken(self):
+        session = self.session()
+        session._transport.request.side_effect = [
+            Frame(RESPONSE_EQ, 1, b"\x00\x08"),
+            Frame(RESPONSE_EQ_ALL, 2, CATALOGUE_789),
+        ]
+        with self.assertRaises(RuntimeError) as caught:
+            session.create_custom_eq("Plugin Test")
+        self.assertIn("3 custom profiles", str(caught.exception))
+        self.assertEqual(self.detail_payloads(session), [])
+
     def test_create_reports_an_unconfirmed_profile(self):
         session = self.session()
 

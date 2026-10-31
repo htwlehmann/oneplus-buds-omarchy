@@ -484,11 +484,24 @@ starting state (id 7 `Test eq` `[4,6,2,0,4,6]`, id 8 `Benutzerdefiniert1`
 `[-5,0,-6,0,0,0]`, id 8 active). See
 [measurement](../measurements/2026-10-31-nord-eq-profiles.json).
 
-The panel shows the profile dropdown shortened with a pencil button (rename)
-and a plus button (new profile) on the right. Both turn the dropdown into a
-name field; the plus button stores a new profile in the next free slot, the
-pencil renames the selected profile. The delete action exists in the backend
-and CLI to restore test states, but is not exposed in the panel.
+The panel shows the profile dropdown shortened with a pencil button (rename),
+a plus button (new profile) and a trash button (delete profile) on the right.
+The pencil and the plus turn the dropdown into a name field; the plus button
+stores a new profile in the next free slot, the pencil renames the selected
+profile. The trash button asks for confirmation and then removes the selected
+profile, which frees a slot for a new one.
+
+The earbuds hold exactly three custom profiles (ids 7, 8 and 9); a create with
+id 10 was refused by the device. The plugin therefore uses the first free id
+of that range, refuses a create with a clear message when every slot is in
+use and greys out the plus button with the hint "All custom EQ slots are in
+use. Delete a profile to add another."
+
+The delete action exists in the backend and the CLI as well, so a test state
+can be restored. The profile dropdown keeps the name of the profile that was
+selected: the control writes its own index when the user picks an entry, so
+the index is set explicitly instead of relying on a binding that the control
+drops.
 
 The name field needs the keyboard, so the panel uses the shell's
 `KeyboardPanel` (layer-shell with a keyboard focus prime) instead of the

@@ -45,6 +45,11 @@ class EqProfile:
     supports_custom: bool
     write_verified: bool
     custom_write_verified: bool
+    # Custom profiles live in their own id range above the factory presets.
+    # The Nord owner measured ids 7, 8 and 9 as writable and the device
+    # refused id 10, so the range holds exactly three custom profiles.
+    custom_base: int | None = None
+    custom_max: int | None = None
 
     def preset_for(self, value: str) -> EqPresetProfile | None:
         normalized = value.strip().lower()
@@ -196,7 +201,7 @@ PROFILES = {
             },
         ),
         eq=EqProfile(NORD_BUDS_3_PRO_EQ_PRESETS, supports_custom=True, write_verified=True,
-                     custom_write_verified=True),
+                     custom_write_verified=True, custom_base=7, custom_max=3),
         capabilities=frozenset(
             {
                 "battery",

@@ -151,10 +151,21 @@ BarWidget {
   property string profileNameMode: ""
   property string profileNameDraft: ""
   property int profileRenameEntryId: -1
+  property bool deleteConfirmOpen: false
+  property int pendingDeleteEntryId: -1
+  property string pendingDeleteName: ""
   readonly property bool customEqWritable: !!(snapshot
     && snapshot.custom_eq_write_verified === true
     && snapshot.session_connected === true
     && connection === "connected" && pendingRequestId < 0)
+  // Local fork: the earbuds hold a fixed number of custom profiles. The plus
+  // button is greyed out when every slot is taken.
+  readonly property int customEqMax: snapshot && snapshot.custom_eq_max
+    ? Number(snapshot.custom_eq_max) : 0
+  readonly property int customEqSlots: snapshot && snapshot.custom_eq_slots !== undefined
+    ? Number(snapshot.custom_eq_slots) : customEqEntries.length
+  readonly property bool customEqSlotsFull: customEqMax > 0
+    && customEqSlots >= customEqMax
   property bool touchControlsExpanded: false
   property bool reportDetailsOpen: false
   property bool reportSaved: false
@@ -173,15 +184,28 @@ BarWidget {
     for (var i = 0; i < customEqEntries.length; i++) {
       if (customEqEntries[i].eq_id === eqStatus.current_id) {
         customSlotIndex = i
+        applyCustomSlotIndex()
         return
       }
     }
     customSlotIndex = 0
+    applyCustomSlotIndex()
+  }
+
+  // The dropdown control writes its own currentIndex when the user picks an
+  // entry, which removes the binding to customSlotIndex. Setting the index
+  // explicitly keeps the chosen name in the dropdown.
+  function applyCustomSlotIndex() {
+    if (!customEqEntries.length) return
+    var index = Math.max(0, Math.min(customSlotIndex, customEqEntries.length - 1))
+    if (customEqSelector && customEqSelector.currentIndex !== index)
+      customEqSelector.currentIndex = index
   }
 
   function selectCustomSlot(index) {
     if (index < 0 || index >= customEqEntries.length) return
     customSlotIndex = index
+    applyCustomSlotIndex()
     customSelectionDirty = true
   }
 
@@ -198,6 +222,7 @@ BarWidget {
       touchControlsExpanded = false
       resetHoldCycleDraft()
       cancelProfileName()
+      cancelDeleteCustomProfile()
       customSelectionDirty = false
       syncCustomSlotFromEq()
       collapseTimer.stop()
@@ -434,7 +459,7 @@ BarWidget {
 
   // Local fork: create a new custom profile in the next free device slot.
   function startProfileCreate() {
-    if (!customEqWritable) return
+    if (!customEqWritable || customEqSlotsFull) return
     profileNameMode = "create"
     profileNameDraft = ""
     profileRenameEntryId = -1
@@ -498,6 +523,36 @@ BarWidget {
     pendingRequestId = requestId
     pendingKind = "custom_eq_rename"
     pendingMode = name
+    outcome = ""
+    requestWatchdog.restart()
+  }
+
+  // Local fork: deleting a custom profile frees a slot for a new one, so the
+  // panel asks before it removes a profile from the earbuds.
+  function askDeleteCustomProfile(entry) {
+    if (!customEqWritable || !entry) return
+    pendingDeleteEntryId = entry.eq_id
+    pendingDeleteName = String(entry.name || "")
+    deleteConfirmOpen = true
+    outcome = ""
+  }
+
+  function cancelDeleteCustomProfile() {
+    deleteConfirmOpen = false
+    pendingDeleteEntryId = -1
+    pendingDeleteName = ""
+  }
+
+  function confirmDeleteCustomProfile() {
+    var entryId = pendingDeleteEntryId
+    cancelDeleteCustomProfile()
+    if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
+    if (entryId < 0) return
+    var requestId = budsService.deleteCustomEq(entryId, customEqDeviceKey)
+    if (requestId === null) { outcome = "Could not start request"; return }
+    pendingRequestId = requestId
+    pendingKind = "custom_eq_delete"
+    pendingMode = "custom profile"
     outcome = ""
     requestWatchdog.restart()
   }
@@ -616,7 +671,8 @@ BarWidget {
     if (response.ok === true && (completedKind === "eq_status"
         || completedKind === "eq" || completedKind === "custom_eq"
         || completedKind === "custom_eq_create"
-        || completedKind === "custom_eq_rename")) {
+        || completedKind === "custom_eq_rename"
+        || completedKind === "custom_eq_delete")) {
       customSelectionDirty = false
       syncCustomSlotFromEq()
     }
@@ -635,6 +691,8 @@ BarWidget {
     }
     if (completedKind === "custom_eq_rename" && response.ok === true)
       cancelProfileName()
+    if (completedKind === "custom_eq_delete" && response.ok === true)
+      cancelDeleteCustomProfile()
     if (response.ok === true) {
       if (completedKind === "custom_eq" && (!response.result || response.result.verified !== true)) {
         outcome = "EQ change was not confirmed by earbuds"
@@ -775,6 +833,20 @@ BarWidget {
     contentWidth: popup.fittedContentWidth(Style.space(600))
     contentHeight: popup.fittedContentHeight(panelContent.implicitHeight)
 
+    // Local fork: deleting a custom profile asks for confirmation first.
+    ConfirmDialog {
+      id: deleteConfirm
+      anchors.fill: parent
+      z: 10
+      opened: root.deleteConfirmOpen
+      message: "Delete the custom profile “" + root.pendingDeleteName + "”?"
+      cancelText: "Cancel"
+      confirmText: "Delete"
+      fontFamily: root.bar.fontFamily
+      onCanceled: root.cancelDeleteCustomProfile()
+      onConfirmed: root.confirmDeleteCustomProfile()
+    }
+
     Flickable {
       id: panelScroll
       anchors.fill: parent
@@ -841,7 +913,7 @@ BarWidget {
             width: Style.space(28)
             height: Style.space(28)
             visible: !root.editingName
-            text: "✎"
+            text: "\uF040"
             bordered: false
             enabled: root.connection !== "unavailable"
             opacity: enabled ? 1.0 : 0.5
@@ -1045,7 +1117,7 @@ BarWidget {
 
                 readonly property real actionWidth: Style.space(28)
                 readonly property real fieldWidth: Math.max(0, width
-                  - 2 * actionWidth - 2 * spacing)
+                  - 3 * actionWidth - 3 * spacing)
 
                 Controls.ComboBox {
                   id: customEqSelector
@@ -1054,7 +1126,11 @@ BarWidget {
                   height: Style.space(32)
                   visible: root.profileNameMode === ""
                   model: root.customEqEntries.map(function(entry) { return entry.name })
+                  // The control writes currentIndex when the user picks an
+                  // entry, which drops the binding. The index is therefore
+                  // set explicitly, so the name stays where it was selected.
                   currentIndex: root.customSlotIndex
+                  onModelChanged: root.applyCustomSlotIndex()
                   enabled: root.customEqExpanded && root.pendingRequestId < 0
                   onActivated: function(index) { root.activateCustomSlot(index) }
                 }
@@ -1081,7 +1157,7 @@ BarWidget {
                   objectName: "customEqFirstAction"
                   width: parent.actionWidth
                   height: Style.space(28)
-                  text: root.profileNameMode === "" ? "✎" : "✕"
+                  text: root.profileNameMode === "" ? "\uF040" : "✕"
                   bordered: false
                   enabled: root.profileNameMode === ""
                     ? root.customEqWritable && !!root.selectedCustom
@@ -1110,6 +1186,7 @@ BarWidget {
                   }
                 }
 
+
                 Button {
                   id: customEqSecondAction
                   objectName: "customEqSecondAction"
@@ -1118,7 +1195,7 @@ BarWidget {
                   text: root.profileNameMode === "" ? "+" : "✓"
                   bordered: false
                   enabled: root.profileNameMode === ""
-                    ? root.customEqWritable
+                    ? root.customEqWritable && !root.customEqSlotsFull
                     : root.pendingRequestId < 0
                     && String(root.profileNameDraft || "").trim().length > 0
                   opacity: enabled ? 1.0 : 0.5
@@ -1135,7 +1212,10 @@ BarWidget {
 
                   Controls.ToolTip {
                     visible: customEqSecondHover.hovered && customEqSecondAction.visible
-                    text: root.profileNameMode === "" ? "New profile" : "Save name"
+                    text: root.profileNameMode === ""
+                      ? (root.customEqSlotsFull ? "All custom EQ slots are in use"
+                        : "New profile")
+                      : "Save name"
                     delay: 400
                     font.family: root.bar.fontFamily
                     font.pixelSize: Style.font.bodySmall
@@ -1144,6 +1224,48 @@ BarWidget {
                     palette.dark: Color.accent
                   }
                 }
+
+                Button {
+                  id: customEqDeleteAction
+                  objectName: "customEqDeleteAction"
+                  width: parent.actionWidth
+                  height: Style.space(28)
+                  text: "\uF1F8"
+                  bordered: false
+                  enabled: root.profileNameMode === ""
+                    && root.customEqWritable && !!root.selectedCustom
+                  opacity: enabled ? 1.0 : 0.5
+                  foreground: root.bar.foreground
+                  background: root.bar.background
+                  accent: Color.accent
+                  fontFamily: root.bar.fontFamily
+                  onClicked: root.askDeleteCustomProfile(root.selectedCustom)
+
+                  HoverHandler { id: customEqDeleteHover }
+
+                  Controls.ToolTip {
+                    visible: customEqDeleteHover.hovered && customEqDeleteAction.visible
+                    text: "Delete profile"
+                    delay: 400
+                    font.family: root.bar.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    palette.toolTipBase: root.bar.background
+                    palette.toolTipText: root.bar.foreground
+                    palette.dark: Color.accent
+                  }
+                }
+              }
+
+              Text {
+                objectName: "customEqSlotsHint"
+                width: parent.width
+                visible: root.customEqExpanded && root.customEqSlotsFull
+                text: "All custom EQ slots are in use. Delete a profile to add another."
+                color: root.bar.foreground
+                opacity: 0.72
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                wrapMode: Text.Wrap
               }
 
               EqCurveEditor {

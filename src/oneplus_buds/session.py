@@ -477,9 +477,7 @@ class OpoSession:
         if template is None:
             raise RuntimeError("the earbuds did not declare a custom EQ layout")
         used = {item.eq_id for item in before.custom_entries}
-        slot = max(used) + 1 if used else 0
-        if slot > 0xFF:
-            raise RuntimeError("no free custom EQ slot is left")
+        slot = self._next_custom_slot(used)
         entry = EqEntry(slot, label, False, template.min_gain_db, template.max_gain_db,
                         template.bands)
         gains = tuple(0 for _ in template.bands)
@@ -582,6 +580,31 @@ class OpoSession:
             before.current_id, before.current_name,
             acknowledgement, True, timer.finish("session_total"), query_count,
         ), EventBatch(tuple(events), ignored)
+
+    def _next_custom_slot(self, used: set[int]) -> int:
+        """Return the next free custom profile id of the connected earbuds.
+
+        Profiles above the factory presets live in their own id range. The
+        Nord holds exactly three of them (ids 7, 8 and 9); the device refused
+        id 10, so a write beyond the range would only be rejected.
+        """
+        eq = self.profile.eq
+        base = eq.custom_base if eq is not None else None
+        maximum = eq.custom_max if eq is not None else None
+        if base is not None and maximum:
+            free = [base + offset for offset in range(maximum)
+                    if base + offset not in used]
+            if not free:
+                raise RuntimeError(
+                    f"the earbuds already hold {maximum} custom profiles; "
+                    "delete one before adding another"
+                )
+            return free[0]
+        if used:
+            candidate = max(used) + 1
+            if candidate <= 0xFF:
+                return candidate
+        raise RuntimeError("no free custom EQ slot is left")
 
     def _write_eq_entry(self, entry: EqEntry, gains_db: tuple[int, ...], *,
                         action: int, name: str | None = None,
