@@ -1,5 +1,6 @@
 import QtQuick
 import QtTest
+import "BarModel.js" as BarModel
 TestCase {
  name: "BatteryHover"
  width: 600; height: 100; visible: true
@@ -58,6 +59,20 @@ TestCase {
  }
  BarWidget { id: widget; bar: host; x: 200; y: 20; width: implicitWidth; height: implicitHeight }
  Component { id: anotherWidget; BarWidget { bar: host } }
+ function test_features_use_model_labels_and_hide_unadvertised_raw_switches() {
+  var features = BarModel.featureList({
+   feature_switches:{multipoint:true, wear_detection:true, low_latency:false,
+    game_equalizer:true, high_quality_audio:false, hearing_enhancement:false,
+    spatial_sound:false},
+   feature_labels:{multipoint:"Dual connection", wear_detection:"Auto play/pause",
+    high_quality_audio:"Hi-Res mode"}, writable_features:[]})
+  compare(features.length, 3)
+  compare(features[0].label, "Auto play/pause")
+  compare(features[1].label, "Dual connection")
+  compare(features[2].label, "Hi-Res mode")
+  verify(!features[0].writable)
+  compare(BarModel.featureList({feature_switches:{low_latency:false}}).length, 1)
+ }
  function init() {
   service.connection = "connected"
   service.snapshot = ({status:{model:"Test buds",battery:{left:{percentage:80},right:{percentage:60}}},
@@ -101,7 +116,8 @@ TestCase {
   var button = findChild(widget, "findEarbudsButton")
   verify(button !== null)
   var hint = findChild(widget, "findEarbudsHint")
-  verify(hint.text.indexOf("Remove earbuds") !== -1)
+  verify(!hint.visible)
+  verify(button.tooltipText.indexOf("Remove earbuds") !== -1)
   verify(button.text.indexOf("▶") !== -1)
   button.clicked()
   compare(service.findRequests, [true])
@@ -113,6 +129,7 @@ TestCase {
   wait(0)
   verify(widget.finding && button.enabled)
   compare(button.text, "■ Stop")
+  compare(button.tooltipText, "")
   button.clicked()
   compare(service.findRequests, [true,false])
   service.snapshot = findSnapshot("unknown")

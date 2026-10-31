@@ -12,7 +12,7 @@ from .controller import BudsController
 from .case_battery import CaseBatteryCache, default_cache_directory
 from .timing import AncRequestError
 from .models import ControllerSnapshot, ControlResult, EqControlResult
-from .profiles import compatibility_for_product, profile_for_product
+from .profiles import compatibility_for_product, feature_capabilities, profile_for_product
 from .protocol import FEATURE_SWITCH_NAMES
 from .touch import serialize_touch_controls, serialize_hold_cycle
 from .report import build_snapshot_report, write_report
@@ -31,7 +31,7 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
     """Return the stable, address-free snapshot exposed to frontends."""
     profile = profile_for_product(snapshot.status.product_id) if snapshot.status else None
     capabilities = set(profile.capabilities) if profile else set()
-    capabilities.update(snapshot.feature_switches)
+    capabilities.update(feature_capabilities(profile, snapshot.feature_switches))
     return {
         "status": snapshot.status.to_dict() if snapshot.status is not None else None,
         "compatibility": compatibility_for_product(
@@ -48,6 +48,8 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
             profile and profile.verified and profile.eq and profile.eq.custom_write_verified
         ),
         "writable_features": sorted(profile.writable_features) if profile else [],
+        "feature_labels": dict(profile.feature_labels)
+        if profile and profile.feature_labels is not None else None,
         "feature_switches": dict(snapshot.feature_switches),
         "session_connected": snapshot.session_connected,
         "advertised_event_codes": list(snapshot.advertised_event_codes),

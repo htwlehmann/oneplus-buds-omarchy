@@ -104,8 +104,8 @@ function eqPresets(snapshot) {
   return eq && Array.isArray(eq.presets) ? eq.presets : []
 }
 
-// Local fork: the phone app's feature switches, in the order the app lists
-// them. Only switches the device actually reported are offered.
+// Model-specific app labels also act as an allowlist after a profile audit.
+// Raw switch replies remain available for diagnostics.
 var FEATURE_LABELS = {
   personal_noise: "Personalised noise cancellation",
   bass_engine: "BassWave",
@@ -145,11 +145,13 @@ function featureList(snapshot) {
   if (!switches || typeof switches !== "object") return []
   var writable = snapshot && Array.isArray(snapshot.writable_features)
     ? snapshot.writable_features : []
+  var labels = snapshot && snapshot.feature_labels
   var result = []
   for (var i = 0; i < FEATURE_ORDER.length; i++) {
     var name = FEATURE_ORDER[i]
+    if (labels && typeof labels[name] !== "string") continue
     if (typeof switches[name] === "boolean")
-      result.push({ name: name, label: FEATURE_LABELS[name] || titleCase(name),
+      result.push({ name: name, label: (labels && labels[name]) || FEATURE_LABELS[name] || titleCase(name),
         enabled: switches[name],
         writable: writable.indexOf(name) !== -1 })
   }

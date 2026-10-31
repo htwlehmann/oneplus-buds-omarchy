@@ -162,25 +162,58 @@ offers preset selection only.
 
 ## Feature switches
 
-The app's model table marks this model as supporting twelve feature switches.
-All twelve were read back from the device with the app's own request shape
-(`0x010d` with a count byte followed by the wanted ids) and can be written with
-`0x0403` and the two byte payload `[feature id, status]`:
+The previous twelve-feature claim was incorrect: a generic `0x010d` switch
+reply does not establish support. The audit on 2026-10-31 used Wireless
+Earphones **17.6.6** (`com.oplus.melody`), whitelist entry `064414`, app defaults,
+UI gates, resource labels, and a read-only capability query on the owner's unit.
+No HeyMelody 117 APK was supplied.
 
-| Feature | ID | State on the owner's unit |
+The panel now offers only these audited entries:
+
+| App label | ID | Plugin access |
 |---|---:|---|
-| Wear detection | `04` | on |
-| Low latency game mode | `06` | off |
-| Vocal enhancement | `09` | off |
-| Hearing enhancement | `0b` | off |
-| Personalised noise cancellation | `0c` | on |
-| Tap to take photo | `0d` | on |
-| Dual connection | `11` | on |
-| High quality audio | `18` | off |
-| Spatial sound | `1b` | off |
-| Bass engine | `1d` | on |
-| Diagnostic logs | `1e` | on |
-| Game equalizer | `21` | on |
+| Personalised noise cancellation | `0c` | verified writes |
+| BassWave | `1d` | verified writes |
+| Auto play/pause | `04` | read-only |
+| Camera control | `0d` | read-only; camera integration depends on the phone |
+| Dual connection | `11` | read-only |
+| Hi-Res mode | `18` | read-only; codec/host support remains relevant |
+
+`wearDetection=1` selects **Auto play/pause**, not the app's other label,
+“In-ear detection”. **Camera control** and **Hi-Res mode** are resource titles
+from this app build. No new switch writes were enabled or tested.
+
+Hidden entries:
+
+- `06`: separate **Game mode** switch lacks `gameMode`/`gameModeList` support in
+  this model configuration. This does not remove the existing gesture action.
+- `09`: **Vocal enhancement** defaults to disabled/unavailable (`-1`).
+- `21`: **Enhanced PEL audio**, a Peacekeeper Elite option, lacks its required
+  `gameEqPkgList`; “Game equalizer” was misleading.
+- `0b`: model configuration names this **Golden Sound**, but the device lacks
+  its SPP capability `277` (bitmap bit19).
+- `1b`: model configuration names this **OnePlus 3D Audio**, but the device lacks
+  headset spatial capability `61187` (bit43). Phone-side and LE-Audio app paths
+  can expose alternatives; neither proves support in this plugin's SPP path.
+
+The measured `0x8100` reply was `00 ff 27 52 ee c7 14`: success byte followed by
+LSB-first capability bits, decoded with app methods `k.G` and table `B6.a`.
+Camera capability `1039` (bit20) is present. See
+[measurement](../measurements/2026-10-31-nord-feature-audit.json).
+
+The audited feature-label map filters UI entries and reported capabilities.
+Raw switch replies stay available in frontend diagnostics. Other profiles retain
+their previous discovery behavior. This audit applies to the tested firmware;
+future firmware can require another audit. Historical “Diagnostic logs” (`1e`)
+was not part of the current displayed list and is not claimed as supported.
+
+REA exports in the research folder: `rea-readonly-features-2026-10-31-evidence.json`
+and `rea-readonly-main-2026-10-31-evidence.json`. Key Evidence:
+`ev_fb43c28250ab2b8891b6daf049b3baf3d30851c27faed845cd4dba34d8aafe3e`
+(capability parser), `ev_f4919d53828367e407783b625470f7af9bec9114b2196800679f488414a357a5`
+(UI gates), `ev_02581a646ea51dc8d64b4a751ffff7346540a9947cd46f9d74bb8c209c16d56e`
+(Auto play/pause title), `ev_8d09246abff5666913e175caf5574c9693098d4be422c81c183ca1f7a251e9f3`
+(Hi-Res title).
 
 ## BassWave (bass engine)
 
@@ -202,6 +235,9 @@ a pause symbol). `HeadsetCoreService.O0` sends the boolean as one byte; the
 app accepts status00 from `0x8400`, and `cb.d$f.Q` schedules a Stop after50s.
 REA wire Evidence: `ev_d75c730c05579cde8388db0785bfe978267338ef64d7fe81f2e4cdee057665a6`;
 Stop-state Evidence: `ev_c6e50983a7a76e5ae1c14028465acb85f26771650b67d9916da1ba6c61e0483e`.
+
+The idle remove-earbuds hint is a tooltip on Play, with no permanent warning
+row. Pending, playing and uncertain status remain visible.
 
 The plugin now renders `▶ Find my earbuds` / `■ Stop` from shared backend
 state, parses the find acknowledgement itself (the previous ANC-only parser

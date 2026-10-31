@@ -132,7 +132,7 @@ supported. Selected controls reflect read-back state. A pending request is shown
 until verified; an acknowledgement alone never produces a success message.
 
 `▶ Find my earbuds` starts the search tone; `■ Stop` ends it. Remove the buds
-from your ears before starting. Search command acceptance is confirmed through
+from your ears before starting (also noted in the Play button tooltip). Search command acceptance is confirmed through
 the device acknowledgement; an unconfirmed result keeps Stop available. The
 plugin attempts to stop after50seconds and when its panel closes.
 

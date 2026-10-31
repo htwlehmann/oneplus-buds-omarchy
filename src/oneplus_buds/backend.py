@@ -7,7 +7,7 @@ from dataclasses import replace
 from .lifecycle_trace import mark
 from .bluez import Device, select_device
 from .models import CapabilityResult, ControlResult, EqControlResult, EqStatusResult, StatusResult
-from .profiles import compatibility_for_product, profile_for_product
+from .profiles import compatibility_for_product, feature_capabilities, profile_for_product
 from .report import build_status_report
 from .protocol import (
     HELLO,
@@ -104,7 +104,7 @@ def read_capabilities(address: str | None = None) -> CapabilityResult:
     profile = profile_for_product(status.product_id)
     feature_switches = query_feature_switches(address)
     capabilities = set(profile.capabilities) if profile else set()
-    capabilities.update(feature_switches)
+    capabilities.update(feature_capabilities(profile, feature_switches))
     return CapabilityResult(
         model=status.model,
         product_id=status.product_id,

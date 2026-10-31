@@ -55,6 +55,24 @@ EQ_SNAPSHOT = ControllerSnapshot(
 
 
 class BridgeTests(unittest.TestCase):
+    def test_nord_feature_metadata_excludes_generic_replies_for_unadvertised_functions(self):
+        status = replace(STATUS, product_id="064414", model="OnePlus Nord Buds 3 Pro")
+        raw = {"multipoint": True, "wear_detection": True,
+               "high_quality_audio": False, "hearing_enhancement": False,
+               "spatial_sound": False, "click_to_take_photo": True,
+               "low_latency": False, "vocal_enhance": False,
+               "game_equalizer": True}
+        payload = serialize_snapshot(replace(SNAPSHOT, status=status, feature_switches=raw))
+        self.assertEqual(payload["feature_switches"], raw)  # Preserve diagnostics.
+        for name in ("low_latency", "vocal_enhance", "game_equalizer",
+                     "hearing_enhancement", "spatial_sound"):
+            self.assertNotIn(name, payload["capabilities"])
+            self.assertNotIn(name, payload["feature_labels"])
+        self.assertEqual(payload["feature_labels"]["wear_detection"], "Auto play/pause")
+        self.assertEqual(payload["feature_labels"]["click_to_take_photo"], "Camera control")
+        self.assertEqual(payload["feature_labels"]["high_quality_audio"], "Hi-Res mode")
+        self.assertEqual(payload["writable_features"], ["bass_engine", "personal_noise"])
+
     def test_snapshot_serialization_is_json_compatible_and_address_free(self):
         payload = serialize_snapshot(SNAPSHOT)
         encoded = json.dumps(payload)

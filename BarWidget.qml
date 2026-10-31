@@ -1102,6 +1102,7 @@ BarWidget {
                 width: parent.width
                 height: Math.max(implicitHeight, Style.space(32))
                 text: root.finding ? "■ Stop" : "▶ Find my earbuds"
+                tooltipText: root.finding ? "" : "Remove earbuds before playing a sound."
                 selected: root.finding
                 bordered: true
                 leftAlign: true
@@ -1117,12 +1118,13 @@ BarWidget {
 
               Text {
                 objectName: "findEarbudsHint"
+                visible: root.pendingKind === "find" || root.finding
                 width: parent.width
                 text: root.pendingKind === "find" ? (root.pendingMode === "find"
                     ? "Starting sound…" : "Stopping sound…")
                   : root.findState === "unknown" ? "Search status unknown. Use Stop to end the sound."
                   : root.finding ? "Sound playing · automatic stop after 50 s."
-                  : "Remove earbuds before playing a sound."
+                  : ""
                 textFormat: Text.PlainText
                 color: root.bar.foreground
                 opacity: 0.7

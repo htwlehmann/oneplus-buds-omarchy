@@ -98,6 +98,10 @@ class DeviceProfile:
     # Wire action -> allowed function IDs. Empty means no touch writes.
     touch_functions: dict[int, tuple[int, ...]] = field(default_factory=dict)
     hold_cycle_supported: bool = False
+    # None preserves generic discovery for unaudited models. An audited map
+    # lists only audited model/device switches and their app labels; generic query
+    # replies (including false values) do not establish feature support.
+    feature_labels: dict[str, str] | None = None
 
     @property
     def verified(self) -> bool:
@@ -221,6 +225,18 @@ PROFILES = {
             "bass_engine",
             "personal_noise",
         }),
+        # Wireless Earphones 17.6.6, whitelist 064414, plus the owner's
+        # 0100 capability reply 00 ff 27 52 ee c7 14. Golden Sound (bit19)
+        # and headset spatial audio (bit43) are absent on this SPP path.
+        # Phone/LE-Audio fallbacks do not establish support in this plugin.
+        feature_labels={
+            "personal_noise": "Personalised noise cancellation",
+            "bass_engine": "BassWave",
+            "wear_detection": "Auto play/pause",
+            "click_to_take_photo": "Camera control",
+            "multipoint": "Dual connection",
+            "high_quality_audio": "Hi-Res mode",
+        },
         # App support masks: 516, 8807, 8803, 536. App action 11 maps
         # to wire action 4 (fixed noise-control hold, not a selector).
         touch_functions={
@@ -241,6 +257,14 @@ PROFILES = {
 
 def profile_for_product(product_id: str | None) -> DeviceProfile | None:
     return PROFILES.get(product_id or "")
+
+
+def feature_capabilities(profile: DeviceProfile | None, switches: dict[str, bool]) -> set[str]:
+    """Keep raw diagnostic switch replies separate from advertised support."""
+    names = set(switches)
+    if profile is not None and profile.feature_labels is not None:
+        names.intersection_update(profile.feature_labels)
+    return names
 
 
 def compatibility_for_product(product_id: str | None) -> CompatibilityState:
