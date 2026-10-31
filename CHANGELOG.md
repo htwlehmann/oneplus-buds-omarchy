@@ -23,6 +23,9 @@
 - Keep the name of the selected profile in the profile dropdown: the control
   drops the index binding when the user picks an entry, so the index is now
   set explicitly.
+- Hide the compatibility notice while no device is connected: without a known
+  product the backend reported "experimental", so the panel claimed an
+  experimental device while showing the generic "OnePlus earbuds" name.
 
 - Add an app-like Play/Stop earbud search control with correct `0x8400`
   acknowledgement handling, shared uncertain/confirmed state, per-device
