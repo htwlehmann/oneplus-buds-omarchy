@@ -126,11 +126,16 @@ The normal app UI exposes strength choices only after selecting the ANC parent:
 Off → On (`01 01 02`) → strength. It also guards against both buds being unworn
 or in the case (`NoiseReductionItem.java`). A later final-check attempt started
 from an externally changed Off state and Low did not apply; Off was restored.
-The wearing state at that attempt was unknown, so this does not establish an
-On prerequisite or a regression. Further hardware tests were paused pending
-the owner's confirmation that both buds are worn. The final provenance fix
-is covered by positive Auto tests and negative stale-response/contradictory-push
-regressions; only exact selected-mode notifications can provide its fallback.
+After the owner reinserted both buds, the final provenance-hardened version
+passed Off → Low → On → Moderate → High → Auto, then restored Moderate.
+Direct Off → Low succeeded, so an ANC-On prerequisite is not required on this
+unit. The previous refusal is consistent with the unworn/case condition.
+Low/Moderate/High/Auto were confirmed in 82.7/185.8/143.7/124.0 ms, with the
+QML selection observed at 303.7/298.0/296.5/297.5 ms. Every SET returned status
+00 and every transaction used one verification query; Auto's separate selected
+notification provided confirmation while its query returned concrete Low.
+Auto stayed selected during the additional ten-second observation. Tests also
+reject stale query responses and newer contradictory selected-mode pushes.
 
 ## Native EQ
 
