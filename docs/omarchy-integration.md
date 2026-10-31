@@ -166,6 +166,12 @@ cancels. Service createCustomEq/renameCustomEq use the same optional deviceId
 token as setCustomEq. The new profile is created in the next free device slot
 and the profile that was active before the write is re-selected afterwards.
 
+Custom profile and touch selections use the shell's themed `qs.Ui.Dropdown`.
+Its string-valued selection is converted back to the existing slot index or
+numeric touch function before invoking the same handlers. Touch controls restore
+their binding immediately after selection and display only device-confirmed
+values, including when a write fails.
+
 The panel uses the shell's `KeyboardPanel` instead of `PopupCard`. A
 `PopupCard` is an xdg-popup: it only receives key events after a click routes
 the focus through its parent surface, so the name field could not be typed

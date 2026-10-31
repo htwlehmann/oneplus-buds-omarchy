@@ -194,14 +194,13 @@ BarWidget {
     setCustomSlotIndex(0)
   }
 
-  // The dropdown control writes its own currentIndex when the user picks an
-  // entry, which removes the binding to customSlotIndex. Setting the index
-  // explicitly keeps the chosen name in the dropdown.
+  // Dropdown writes its own value on selection. Keep it in sync with the
+  // existing slot index when profiles or the selected slot change.
   function applyCustomSlotIndex() {
     if (!customEqEntries.length) return
     var index = Math.max(0, Math.min(customSlotIndex, customEqEntries.length - 1))
-    if (customEqSelector && customEqSelector.currentIndex !== index)
-      customEqSelector.currentIndex = index
+    if (customEqSelector && customEqSelector.value !== String(index))
+      customEqSelector.value = String(index)
   }
 
   function setCustomSlotIndex(index) {
@@ -1128,20 +1127,23 @@ BarWidget {
                 readonly property real fieldWidth: Math.max(0, width
                   - 3 * actionWidth - 3 * spacing)
 
-                Controls.ComboBox {
+                Dropdown {
                   id: customEqSelector
                   objectName: "customEqSelector"
                   width: parent.fieldWidth
                   height: Style.space(32)
+                  rowHeight: height
+                  showLabel: false
+                  foreground: root.bar.foreground
+                  fontFamily: root.bar.fontFamily
                   visible: root.profileNameMode === ""
-                  model: root.customEqEntries.map(function(entry) { return entry.name })
-                  // The control writes currentIndex when the user picks an
-                  // entry, which drops the binding. The index is therefore
-                  // set explicitly, so the name stays where it was selected.
-                  currentIndex: root.customSlotIndex
-                  onModelChanged: root.applyCustomSlotIndex()
+                  options: root.customEqEntries.map(function(entry, index) {
+                    return {value: String(index), label: entry.name}
+                  })
+                  value: String(root.customSlotIndex)
+                  onOptionsChanged: root.applyCustomSlotIndex()
                   enabled: root.customEqExpanded && root.pendingRequestId < 0
-                  onActivated: function(index) { root.activateCustomSlot(index) }
+                  onChanged: function(value) { root.activateCustomSlot(Number(value)) }
                 }
 
                 Controls.TextField {
@@ -1623,9 +1625,12 @@ BarWidget {
                       font.family: root.bar.fontFamily
                       font.pixelSize: Style.font.bodySmall
                     }
-                    Controls.ComboBox {
+                    Dropdown {
                       objectName: "touchSelector_" + touchRow.modelData.side + "_" + touchRow.modelData.action
                       width: parent.width
+                      showLabel: false
+                      foreground: root.bar.foreground
+                      fontFamily: root.bar.fontFamily
                       visible: touchRow.modelData.writable
                       property var choices: {
                         var options = touchRow.modelData.options || []
@@ -1633,26 +1638,17 @@ BarWidget {
                           return [{value: touchRow.modelData.function, label: touchRow.modelData.function_label}].concat(options)
                         return options
                       }
-                      model: choices
-                      textRole: "label"
-                      currentIndex: {
-                        for (var i = 0; i < choices.length; i++)
-                          if (choices[i].value === touchRow.modelData.function) return i
-                        return -1
-                      }
+                      options: choices
+                      value: String(touchRow.modelData.function)
                       enabled: root.connection === "connected" && root.pendingRequestId < 0
                         && snapshot && snapshot.session_connected === true
-                      onActivated: function(index) {
-                        var value = choices[index].value
-                        if (value !== touchRow.modelData.function)
-                          root.setTouchControl(touchRow.modelData.side, touchRow.modelData.action, value)
+                      onChanged: function(selectedValue) {
+                        var selectedFunction = Number(selectedValue)
+                        if (selectedFunction !== touchRow.modelData.function)
+                          root.setTouchControl(touchRow.modelData.side, touchRow.modelData.action, selectedFunction)
                         // Keep showing confirmed state until readback arrives,
                         // including when validation or transmission fails.
-                        currentIndex = Qt.binding(function() {
-                          for (var i = 0; i < choices.length; i++)
-                            if (choices[i].value === touchRow.modelData.function) return i
-                          return -1
-                        })
+                        value = Qt.binding(function() { return String(touchRow.modelData.function) })
                       }
                     }
                     Text {

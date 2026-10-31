@@ -319,16 +319,15 @@ TestCase {
   var right = findChild(widget, "touchSelector_2_2")
   verify(left !== null)
   verify(right !== null)
-  compare(left.currentText, "Next track")
-  compare(left.count, 3)
-  compare(right.currentText, "Unknown (254)")
+  compare(left.currentLabel(), "Next track")
+  compare(left.options.length, 3)
+  compare(right.currentLabel(), "Unknown (254)")
   compare(findChild(widget, "touchSelector_1_4").visible, false)
-  left.currentIndex = 1
-  left.activated(1)
+  left.select("5")
   compare(service.touchRequest.side, 1)
   compare(service.touchRequest.action, 2)
   compare(service.touchRequest.function, 5)
-  compare(left.currentText, "Next track")  // display only confirmed state
+  compare(left.currentLabel(), "Next track")  // display only confirmed state
   verify(!left.enabled)
   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:false}}
   wait(0)
@@ -816,7 +815,7 @@ TestCase {
   verify(widget.outcome.indexOf("Verified") !== -1)
   // The dropdown shows the profile that was just created.
   compare(widget.selectedCustom.eq_id, 8)
-  compare(selector.currentIndex, widget.customSlotIndex)
+  compare(selector.value, String(widget.customSlotIndex))
 
   first.clicked()
   wait(0)
@@ -877,12 +876,20 @@ TestCase {
   verify(trash.x + trash.width <= selector.x + selector.width + selector.width)
 
   // The chosen name must survive the model rebuild of the next snapshot.
-  widget.selectCustomSlot(1)
-  compare(selector.currentIndex, 1)
+  selector.select("1")
+  compare(widget.selectedCustom.eq_id, 8)
+  compare(service.customRequest.entry_id, 8)
+  compare(selector.value, "1")
+  // A successful activation publishes the device readback before replying.
+  state.eq.current_id = 8
+  state.eq.current_name = "Second"
+  service.snapshot = JSON.parse(JSON.stringify(state))
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,result:{verified:true}}
+  wait(0)
   service.snapshot = JSON.parse(JSON.stringify(state))
   wait(0)
-  compare(selector.currentIndex, 1)
-  compare(selector.currentText, "Second")
+  compare(selector.value, "1")
+  compare(selector.currentLabel(), "Second")
 
   // Deleting asks for confirmation first.
   var queuedBefore = service.queuedRequests.length

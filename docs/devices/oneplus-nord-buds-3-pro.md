@@ -547,9 +547,10 @@ use. Delete a profile to add another."
 
 The delete action exists in the backend and the CLI as well, so a test state
 can be restored. The profile dropdown keeps the name of the profile that was
-selected: the control writes its own index when the user picks an entry, so
-the index is set explicitly instead of relying on a binding that the control
-drops.
+selected: the Omarchy `Dropdown` writes its own string value when the user
+picks an entry, so the value is explicitly synchronized with the existing slot
+index. Touch selections use the same themed component and immediately restore
+their binding to the device-confirmed function. Backend commands are unchanged.
 
 The name field needs the keyboard, so the panel uses the shell's
 `KeyboardPanel` (layer-shell with a keyboard focus prime) instead of the
