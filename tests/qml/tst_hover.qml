@@ -627,6 +627,23 @@ TestCase {
   verify(widget.outcome.indexOf("not confirmed")!==-1)
   verify(curve.enabled)
  }
+ function test_device_rename_button_only_exists_for_a_connected_device() {
+  service.snapshot = ({status:{model:"Nord",battery:{}}, anc_modes:["off","on"],
+   capabilities:[], session_connected:true, compatibility:"verified"})
+  service.connection = "connected"
+  widget.popupOpen = true
+  wait(0)
+  var rename = findChild(widget, "deviceRenameButton")
+  verify(rename !== null)
+  verify(rename.visible)
+  service.connection = "disconnected"
+  wait(0)
+  verify(!rename.visible)
+  service.connection = "connected"
+  wait(0)
+  verify(rename.visible)
+ }
+
  function test_panel_falls_back_when_width_is_narrow() {
   service.snapshot = ({status:{model:"Test buds",battery:{}}, anc_modes:["off","on"],
    capabilities:["eq"], session_connected:true, eq_write_verified:true,

@@ -117,6 +117,7 @@ BarWidget {
   // Local fork: a lost connection invalidates a request that can no longer
   // be answered, so the panel must not stay disabled.
   onConnectionChanged: {
+    if (connection !== "connected") editingName = false
     if (connection !== "connected" && pendingRequestId >= 0) {
       if (pendingKind === "custom_eq") customCurve.settle()
       pendingRequestId = -1
@@ -905,7 +906,7 @@ BarWidget {
           Controls.TextField {
             id: nameField
             width: parent.width - Style.space(36)
-            visible: root.editingName
+            visible: root.editingName && root.connection === "connected"
             text: root.deviceName
             selectByMouse: true
             onAccepted: root.saveDeviceName()
@@ -914,13 +915,16 @@ BarWidget {
             font.pixelSize: Style.font.subtitle
           }
 
+          // The pencil only belongs to a connected device: without one there is
+          // no name to rename.
           Button {
+            objectName: "deviceRenameButton"
             width: Style.space(28)
             height: Style.space(28)
-            visible: !root.editingName
+            visible: !root.editingName && root.connection === "connected"
             text: "\uF040"
             bordered: false
-            enabled: root.connection !== "unavailable"
+            enabled: root.connection === "connected"
             opacity: enabled ? 1.0 : 0.5
             foreground: root.bar.foreground
             background: root.bar.background
@@ -932,7 +936,7 @@ BarWidget {
           Button {
             width: Style.space(28)
             height: Style.space(28)
-            visible: root.editingName
+            visible: root.editingName && root.connection === "connected"
             text: "✓"
             bordered: false
             enabled: root.pendingRequestId < 0
