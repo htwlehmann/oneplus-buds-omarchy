@@ -42,6 +42,13 @@ Connection values are `connecting`, `connected`, `disconnected`, `reconnecting`,
 
 Bluetooth addresses, raw OPO frames, pairing data, and raw notification payloads are never included. Unknown products are marked `experimental` and receive no inferred write modes or static capabilities.
 
+For profiles advertising `case_battery`, `status.battery.case` may include
+`last_known: true`. This means the current sample omitted the case or returned
+an unusable level, so `percentage` is the last valid 1..100 reading for that
+physical device and product. Its `charging` is always false. The default bridge
+persists these levels in the user's XDG cache directory; cache failures do not
+interrupt control. Without a previous valid level, the case field is omitted.
+
 ## Commands
 
 `execute(command, parameters, request_id=...)` currently accepts only:

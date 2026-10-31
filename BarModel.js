@@ -23,7 +23,8 @@ function batteryParts(snapshot) {
       short: name.short,
       long: name.long,
       percentage: Math.round(value.percentage),
-      charging: value.charging === true
+      charging: value.charging === true,
+      lastKnown: value.last_known === true
     })
   }
   return parts
@@ -243,9 +244,11 @@ function presentation(connection, snapshot) {
   var details = []
   for (var i = 0; i < parts.length; i++) {
     var suffix = parts[i].charging ? "⚡" : ""
+    if (parts[i].lastKnown) suffix = "*"
     labels.push(parts[i].short + " " + parts[i].percentage + "%" + suffix)
     details.push(parts[i].long + ": " + parts[i].percentage + "%"
-      + (parts[i].charging ? " (charging)" : ""))
+      + (parts[i].lastKnown ? " (last known)"
+         : parts[i].charging ? " (charging)" : ""))
   }
 
   var status = snapshot && snapshot.status

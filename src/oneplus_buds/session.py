@@ -90,6 +90,7 @@ class OpoSession:
         self._subscription_pending = False
         self._connected = False
         self._authenticated = False
+        self._last_battery_refresh = monotonic()
         self.advertised_event_codes: tuple[int, ...] = ()
 
     @classmethod
@@ -117,9 +118,7 @@ class OpoSession:
             if battery is None:
                 raise RuntimeError("essential device state is not available")
             if "case_battery" not in profile.capabilities:
-                # Some cases report a placeholder component without a real
-                # battery. The phone app hides the case level for those models,
-                # so the plugin must not show a misleading zero either.
+                # Only expose case readings for profiles with case support.
                 battery = {name: value for name, value in battery.items()
                            if name != "case"}
             with span("query", command=QUERY_ANC):
@@ -479,6 +478,12 @@ class OpoSession:
             self._version_pending = False
             self._version_sequence = self._transport.send_query(QUERY_REMOTE_VERSION)
             mark("optional_firmware_sent")
+        now = monotonic()
+        if "case_battery" in self.profile.capabilities and now - self._last_battery_refresh >= 10:
+            self._last_battery_refresh = now
+            # Read the response through normal polling, without a blocking
+            # query/drain while foreground commands wait for the controller.
+            self._transport.send_query(QUERY_BATTERY)
         received = self._redact(self._transport.receive(wait))
         return EventBatch(
             setup.events + received.events,

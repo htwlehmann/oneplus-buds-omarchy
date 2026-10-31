@@ -198,6 +198,7 @@ PROFILES = {
         capabilities=frozenset(
             {
                 "battery",
+                "case_battery",
                 "firmware",
                 "anc",
                 "transparency",

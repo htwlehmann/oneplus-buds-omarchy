@@ -9,6 +9,7 @@ from typing import TypeAlias
 
 from .availability import Availability
 from .controller import BudsController
+from .case_battery import CaseBatteryCache, default_cache_directory
 from .timing import AncRequestError
 from .models import ControllerSnapshot, ControlResult, EqControlResult
 from .profiles import compatibility_for_product, profile_for_product
@@ -76,7 +77,8 @@ class BudsFrontendBridge:
         availability: Availability | None = None,
         poll_interval: float = 0.5,
     ) -> None:
-        self.controller = controller or BudsController()
+        self.controller = controller or BudsController(
+            case_battery_cache=CaseBatteryCache(default_cache_directory()))
         self.emit = emit
         self.dispatch = dispatch or (lambda callback: callback())
         self._recent_errors: deque[str] = deque(maxlen=12)

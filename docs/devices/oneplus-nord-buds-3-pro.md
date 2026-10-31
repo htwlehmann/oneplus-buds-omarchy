@@ -24,6 +24,30 @@ model's profile. Upstream has no maintainer verification for this product.
 
 The Bluetooth address is deliberately not recorded.
 
+## Case battery (correction, 2026-10-31)
+
+The owner confirmed that the phone shows the case level when the buds are
+inside the open case and connected. The earlier removal in `99bc02a` inferred
+missing hardware support from an unavailable zero reading; that inference
+was incorrect. A read-only `0x0106` query on the owner's unit now returned
+`0x8106: 00 03 01 64 02 64 03 32`: both buds at 100%, case at 50%.
+The open/closed transition itself has not yet been captured in this session.
+
+The decompiled app's `btsdk/api/data/BatteryInfo.java` decodes the same
+component/value pairs (low seven bits = level, high bit = charging), declares
+the minimum level as 1, and `ui/widget/MelodyBatteryViews.java:a()` hides
+levels <= 0. Case support is restored in the Nord profile. The plugin queries
+battery state every ten seconds while connected and accepts case levels
+1..100. Missing, zero, or invalid case samples keep the last valid level.
+
+The bridge saves the last level separately for each product and physical
+device in `$XDG_CACHE_HOME/oneplus-buds/case-battery/` (default `~/.cache/…`),
+using hashed filenames and atomic replacement. Remembered values carry
+`last_known: true`, show `C 50%*` with "last known" in the tooltip, and never
+retain an old charging indicator. With no valid reading yet, the case stays
+hidden. A disconnected plugin still follows the existing disconnected UI;
+the cached case reappears when that device reconnects.
+
 ## Verified ANC profile
 
 The device uses the same little-endian bitmap convention as the Buds Pro 2.

@@ -85,6 +85,7 @@ class NordBuds3ProProfileTests(unittest.TestCase):
             self.profile.capabilities,
             frozenset({
                 "battery",
+                "case_battery",
                 "firmware",
                 "anc",
                 "transparency",

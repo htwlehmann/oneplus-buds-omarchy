@@ -8,6 +8,7 @@ from typing import cast
 from .lifecycle_trace import mark
 from .api import BudsBackend
 from .bluez import read_device_alias, set_device_alias
+from .case_battery import CaseBatteryCache
 from .models import ControllerSnapshot, ControlResult, EqControlResult, EqStatusResult, EventBatch, StatusResult
 from .profiles import profile_for_product
 from .protocol import FEATURE_SWITCH_NAMES, VersionRecord
@@ -20,11 +21,13 @@ class BudsController:
     """Serialized state/session owner for a future service or frontend."""
 
     def __init__(self, backend: BudsBackend | None = None, address: str | None = None,
-                 *, reuse_session: bool = True) -> None:
+                 *, reuse_session: bool = True,
+                 case_battery_cache: CaseBatteryCache | None = None) -> None:
         self.backend = backend or BudsBackend()
         self._selected_address = address
         self.address = address
         self.reuse_session = reuse_session
+        self._case_battery_cache = case_battery_cache or CaseBatteryCache()
         self._lock = RLock()
         self._running = False
         self._session: OpoSession | None = None
@@ -50,6 +53,7 @@ class BudsController:
             try:
                 self._session, self._status, batch = self.backend.start_session(self._selected_address)
                 self.address = self._status.device.address
+                self._update_battery(self._status.battery)
                 self._advertised_event_codes = self._session.advertised_event_codes
                 self._apply_batch(batch)
                 self._running = True
@@ -495,10 +499,7 @@ class BudsController:
         self._ignored_frames += batch.ignored_frames
         for event in batch.events:
             if event.kind == "battery" and self._status is not None:
-                self._status = replace(
-                    self._status,
-                    battery=cast(dict[str, dict[str, int | bool]], event.data),
-                )
+                self._update_battery(cast(dict[str, dict[str, int | bool]], event.data))
             elif event.kind == "anc" and self._status is not None:
                 self._status = replace(
                     self._status,
@@ -531,6 +532,16 @@ class BudsController:
                 self._eq_status = None
         if batch.events:
             self._generation += 1
+
+    def _update_battery(self, battery: dict[str, dict[str, int | bool]] | None) -> None:
+        if self._status is None:
+            return
+        profile = profile_for_product(self._status.product_id)
+        if profile and "case_battery" in profile.capabilities:
+            battery = self._case_battery_cache.merge(self._status, battery)
+        elif battery is not None:
+            battery = {name: value for name, value in battery.items() if name != "case"}
+        self._status = replace(self._status, battery=battery)
 
     def _require_running(self) -> None:
         if not self._running:

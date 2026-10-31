@@ -182,8 +182,12 @@ Review any report before sharing it. See [CLI details](docs/backend-cli.md).
   close other earbud-control applications; do not restart Bluetooth unnecessarily.
 - **ANC change fails:** take both earbuds out of the case, wear them and retry.
   The UI keeps failure visible rather than assuming a change succeeded.
-- **Case battery absent:** some responses do not include it; the UI hides missing
-  fields. Charging/presence semantics still need deliberate edge-case testing.
+- **Case battery absent:** the case must first report a valid level (on the Nord
+  Buds 3 Pro, put the buds inside the open case while connected). Battery state
+  is queried every ten seconds. The plugin remembers the last valid case level
+  across reconnects and shell restarts; `*` and "last known" in the tooltip mark
+  a cached value when the current response omits it or reports an invalid level.
+  Remembered values do not retain an old charging indicator.
 - **A physical gesture is not reflected immediately:** notification payload mapping
   is incomplete. Reopening the popup alone does not query fresh hardware state.
   For a fresh check, disable the plugin, query with the CLI, then re-enable it.
