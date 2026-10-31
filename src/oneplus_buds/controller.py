@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from hashlib import sha256
+from dataclasses import dataclass, replace
 from time import monotonic
 from threading import RLock
 from typing import cast
@@ -15,6 +16,12 @@ from .protocol import FEATURE_SWITCH_NAMES, VersionRecord
 from .session import OpoSession, UnsupportedProductError
 from .touch import TouchBinding, hold_cycle_mask
 from .timing import AncRequestError, PhaseTimer
+
+
+@dataclass(frozen=True)
+class _FindState:
+    state: str = "stopped"
+    deadline: float | None = None
 
 
 class BudsController:
@@ -43,6 +50,7 @@ class BudsController:
         self._touch_bindings: tuple[TouchBinding, ...] = ()
         self._hold_cycle_mask: int | None = None
         self._last_state_refresh: float = 0.0
+        self._find_states: dict[tuple[str, str | None], _FindState] = {}
 
     def start(self) -> ControllerSnapshot:
         with self._lock:
@@ -241,6 +249,7 @@ class BudsController:
                 return self.refresh()
             else:
                 self._apply_batch(batch)
+                self._expire_find()
                 self._refresh_phone_app_state()
             return self.snapshot()
 
@@ -285,6 +294,8 @@ class BudsController:
 
     def shutdown(self) -> ControllerSnapshot:
         with self._lock:
+            if self._running and self._session is not None and self._find_state().state != "stopped":
+                self.find_earbuds(False)
             self._running = False
             self._close_session()
             self.address = self._selected_address
@@ -390,15 +401,65 @@ class BudsController:
                 "set_status": status,
             }
 
-    def find_earbuds(self, ringing: bool = True) -> dict[str, object]:
-        """Start or stop the find-my-earbuds tone."""
+    def find_earbuds(self, ringing: bool = True, *, device_id: str | None = None) -> dict[str, object]:
+        """Track confirmed/uncertain sound state for the selected physical pair."""
         with self._lock:
             self._require_running()
+            intended_key = self._find_key()
+            if device_id is not None and device_id != self._find_device_id():
+                raise ValueError("Selected earbuds changed; search command was not sent")
             if self._session is None:
                 self.refresh()
-            status, sent = cast(OpoSession, self._session).find_earbuds(ringing)
+            key = self._find_key()
+            if ((intended_key is not None and key != intended_key)
+                    or (device_id is not None and device_id != self._find_device_id())):
+                raise ValueError("Selected earbuds changed; search command was not sent")
+            if key is None:
+                raise RuntimeError("no device selected")
+            previous = self._find_state()
+            started = monotonic()
+            try:
+                status, sent = cast(OpoSession, self._session).find_earbuds(ringing)
+            except (OSError, RuntimeError):
+                # The write may already have applied. Never replay a start.
+                self._close_session()
+                status, sent = None, True
+            if status == 0:
+                current = _FindState("ringing", started + 50.0) if ringing else _FindState()
+            elif status is None or not ringing:
+                current = _FindState("unknown", started + 50.0 if ringing else previous.deadline)
+            else:
+                # A rejected start does not turn an idle search into ringing.
+                current = previous
+            if current.state == "stopped":
+                self._find_states.pop(key, None)
+            else:
+                self._find_states[key] = current
             self._generation += 1
-            return {"ringing": ringing, "sent": sent, "set_status": status}
+            return {"ringing": ringing, "sent": sent, "set_status": status,
+                    "acknowledged": status == 0, "state": current.state}
+
+    def _find_key(self) -> tuple[str, str | None] | None:
+        if self._status is None:
+            return None
+        return self._status.device.address.upper(), self._status.product_id
+
+    def _find_state(self) -> _FindState:
+        key = self._find_key()
+        return self._find_states.get(key, _FindState()) if key is not None else _FindState()
+
+    def _find_device_id(self) -> str | None:
+        key = self._find_key()
+        return sha256(f"{key[0]}:{key[1]}".encode()).hexdigest() if key is not None else None
+
+    def _expire_find(self) -> None:
+        current = self._find_state()
+        if current.deadline is not None and monotonic() >= current.deadline:
+            key = self._find_key()
+            if key is not None:
+                # Consume the deadline before I/O; failure must not repeat it.
+                self._find_states[key] = replace(current, deadline=None)
+                self.find_earbuds(False)
 
     def set_bass_level(self, level: int) -> dict[str, object]:
         """Set the bass engine level ("BassWave"), -10 to +10."""
@@ -452,6 +513,8 @@ class BudsController:
                 bass_level=self._bass_level,
                 touch_bindings=self._touch_bindings,
                 hold_cycle_mask=self._hold_cycle_mask,
+                find_state=self._find_state().state,
+                find_device_id=self._find_device_id(),
             )
 
     def _connect_session(self) -> None:
@@ -469,6 +532,10 @@ class BudsController:
         self._apply_batch(batch)
 
     def _close_session(self) -> None:
+        key = self._find_key()
+        current = self._find_state()
+        if key is not None and current.state == "ringing":
+            self._find_states[key] = replace(current, state="unknown")
         self._touch_bindings = ()
         self._hold_cycle_mask = None
         if self._session is not None:

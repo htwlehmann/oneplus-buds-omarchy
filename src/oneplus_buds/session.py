@@ -594,12 +594,18 @@ class OpoSession:
     def find_earbuds(self, ringing: bool = True) -> tuple[int | None, bool]:
         """Start or stop the find-my-earbuds tone."""
         self._require_connected()
+        if not self._authenticated:
+            raise RuntimeError("session authentication has not completed")
+        if not self.profile.verified or "find_earbuds" not in self.profile.capabilities:
+            raise ValueError("earbud search is not supported by a verified profile")
         payload = bytes((1 if ringing else 0,))
         try:
             acknowledgement = self._transport.request(
                 SET_FIND_MODE, payload, RESPONSE_SET_FIND_MODE,
             )
-            status = parse_set_anc_status(acknowledgement)
+            status = (acknowledgement.payload[0]
+                      if acknowledgement.command == RESPONSE_SET_FIND_MODE
+                      and acknowledgement.payload else None)
         except TimeoutError:
             status = None
         return status, True

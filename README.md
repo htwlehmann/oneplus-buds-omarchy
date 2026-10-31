@@ -131,6 +131,11 @@ expanded widget to open the panel. Noise control and ANC strength appear only wh
 supported. Selected controls reflect read-back state. A pending request is shown
 until verified; an acknowledgement alone never produces a success message.
 
+`▶ Find my earbuds` starts the search tone; `■ Stop` ends it. Remove the buds
+from your ears before starting. Search command acceptance is confirmed through
+the device acknowledgement; an unconfirmed result keeps Stop available. The
+plugin attempts to stop after50seconds and when its panel closes.
+
 Wear the earbuds for ANC tests: devices in their case may reject changes. Main
 ANC On may choose a device-dependent strength; select a specific strength if you
 need one. Cold setup still takes several seconds. Warm mode and strength changes

@@ -96,6 +96,38 @@ The result and matching snapshot are captured atomically, and no
 monitoring restoration blocks successful response delivery. Cold/legacy paths
 retain conservative authentication; see the timing documentation for scope.
 
+## Local fork: find my earbuds
+
+`find_earbuds` accepts `{"ringing": boolean}` and optional `device_id` from
+snapshot field `find_device_id` (an opaque hash, never a Bluetooth address).
+The GUI captures that token with the request, including cancellation of a
+pending start. Recovery and token validation reject a changed pair before I/O.
+It uses `0x0400` with
+`01` to start or `00` to stop. Like the phone app, it reads the first status
+byte of a nonempty `0x8400` reply; only status00 acknowledges the request.
+An ANC acknowledgement is not a search acknowledgement. This confirms the
+command was accepted, not that a microphone detected an audible sound.
+
+The result includes `ringing` (requested value), `sent`, `set_status`,
+`acknowledged`, and `state`. Snapshot field `find_state` is `stopped`, `ringing`,
+or `unknown`. Missing/malformed replies or transport loss after a possible
+start leave Stop available; rejected stops never establish silence. A rejected
+idle start remains stopped. The bridge immediately publishes the matching
+snapshot, shared by all widgets.
+
+The controller owns a 50-second deadline for each physical device/product,
+including unconfirmed starts. Normal polling attempts one stop on expiry.
+An unconfirmed automatic stop remains unknown and is not repeatedly replayed.
+Disconnect does not establish silence; the same helper retains unknown state
+for that pair across reconnects and does not send it to another pair. Graceful
+shutdown attempts to stop an owned search before closing the session. A lost
+link or forcibly killed helper cannot guarantee remote silence.
+
+The panel renders `▶ Find my earbuds` / `■ Stop`, follows snapshot state rather
+than optimistically toggling, and sends Stop on close (also during a pending
+start and when an open widget is destroyed). It shows a short remove-earbuds
+hint; the backend does not currently know the physical wearing state.
+
 ## Local fork: touch controls
 
 For the verified Nord Buds 3 Pro, snapshot capability `touch_controls` enables

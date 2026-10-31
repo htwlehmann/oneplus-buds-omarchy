@@ -126,12 +126,19 @@ BarWidget {
   property int pendingRequestId: -1
   // Local fork: the find-my-earbuds tone is a toggle. Like the phone app,
   // the tone stops when the panel is closed.
-  property bool finding: false
+  readonly property string findState: snapshot && snapshot.find_state
+    ? String(snapshot.find_state) : "stopped"
+  readonly property bool finding: findState === "ringing" || findState === "unknown"
+  property string findRequestDeviceId: ""
+  onFindStateChanged: {
+    if (findState === "stopped" && outcomeKind === "find") outcome = ""
+  }
   // Local fork: diagnostic channel for read-only protocol discovery.
   property int diagnosticRequestId: -1
   property string diagnosticResult: ""
   property string pendingMode: ""
   property string outcome: ""
+  property string outcomeKind: ""
   property string pendingKind: ""
   property int customSlotIndex: 0
   property bool customSelectionDirty: false
@@ -207,10 +214,20 @@ BarWidget {
     }
     // Local fork: like the phone app, the find-my-earbuds tone stops when the
     // panel is closed.
-    if (!popupOpen && finding) {
-      finding = false
-      if (budsService && connection === "connected")
-        budsService.findEarbuds(false)
+    if (!popupOpen) stopFindingOnClose()
+  }
+
+  Component.onDestruction: {
+    if (popupOpen) stopFindingOnClose()
+  }
+
+  function stopFindingOnClose() {
+    if ((finding || (pendingKind === "find" && pendingMode === "find"))
+        && !(pendingKind === "find" && pendingMode === "stop")
+        && budsService && connection === "connected") {
+      var target = pendingKind === "find" && pendingMode === "find"
+        ? findRequestDeviceId : snapshot && snapshot.find_device_id
+      budsService.findEarbuds(false, target)
     }
   }
 
@@ -340,13 +357,15 @@ BarWidget {
   function findEarbuds() {
     if (!budsService || connection !== "connected" || pendingRequestId >= 0) return
     var ringing = !finding
-    var requestId = budsService.findEarbuds(ringing)
+    var target = snapshot && snapshot.find_device_id ? String(snapshot.find_device_id) : ""
+    var requestId = budsService.findEarbuds(ringing, target)
     if (requestId === null) { outcome = "Could not start request"; return }
-    finding = ringing
     pendingRequestId = requestId
     pendingKind = "find"
+    findRequestDeviceId = target
     pendingMode = ringing ? "find" : "stop"
     outcome = ""
+    requestWatchdog.restart()
   }
 
   // Local fork: rename the device the way the phone app does.
@@ -475,6 +494,7 @@ BarWidget {
     pendingRequestId = -1
     pendingMode = ""
     var completedKind = pendingKind
+    outcomeKind = completedKind
     pendingKind = ""
     if (completedKind === "hold_cycle") resetHoldCycleDraft()
     // Local fork: continue the startup queue (feature switches, bass level).
@@ -511,7 +531,13 @@ BarWidget {
       } else if (completedKind === "bass") {
         outcome = "Bass level sent"
       } else if (completedKind === "find") {
-        outcome = root.finding ? "Earbuds are ringing" : "Ringing stopped"
+        if (response.result && response.result.acknowledged === true) {
+          outcome = response.result.state === "ringing" ? "Earbuds are ringing" : "Ringing stopped"
+        } else {
+          outcome = root.finding
+            ? "Search command was not confirmed. Use Stop to end the sound."
+            : "Earbuds did not accept the search command"
+        }
       } else if (completedKind === "feature") {
         outcome = "Switch updated"
       } else if (completedKind === "device_name") {
@@ -1065,21 +1091,45 @@ BarWidget {
               }
             }
 
-            Button {
+            Column {
               width: parent.width
-              height: Math.max(implicitHeight, Style.space(32))
+              spacing: Style.space(5)
               visible: snapshot && snapshot.capabilities
                 && snapshot.capabilities.indexOf("find_earbuds") !== -1
-              text: root.finding ? "Stop ringing" : "Find my earbuds"
-              bordered: true
-              leftAlign: true
-              enabled: root.connection === "connected" && root.pendingRequestId < 0
-              opacity: enabled ? 1.0 : 0.5
-              foreground: root.bar.foreground
-              background: root.bar.background
-              accent: Color.accent
-              fontFamily: root.bar.fontFamily
-              onClicked: root.findEarbuds()
+
+              Button {
+                objectName: "findEarbudsButton"
+                width: parent.width
+                height: Math.max(implicitHeight, Style.space(32))
+                text: root.finding ? "■ Stop" : "▶ Find my earbuds"
+                selected: root.finding
+                bordered: true
+                leftAlign: true
+                enabled: root.connection === "connected" && snapshot
+                  && snapshot.session_connected === true && root.pendingRequestId < 0
+                opacity: enabled ? 1.0 : 0.5
+                foreground: root.bar.foreground
+                background: root.bar.background
+                accent: Color.accent
+                fontFamily: root.bar.fontFamily
+                onClicked: root.findEarbuds()
+              }
+
+              Text {
+                objectName: "findEarbudsHint"
+                width: parent.width
+                text: root.pendingKind === "find" ? (root.pendingMode === "find"
+                    ? "Starting sound…" : "Stopping sound…")
+                  : root.findState === "unknown" ? "Search status unknown. Use Stop to end the sound."
+                  : root.finding ? "Sound playing · automatic stop after 50 s."
+                  : "Remove earbuds before playing a sound."
+                textFormat: Text.PlainText
+                color: root.bar.foreground
+                opacity: 0.7
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                wrapMode: Text.Wrap
+              }
             }
           }
         }
@@ -1555,6 +1605,7 @@ BarWidget {
         two_column: root.useTwoColumnLayout,
         anc_modes: root.ancOptions.map(function(option) { return option.value }),
         current_anc: root.currentAncMode,
+        find_state: root.findState,
         pending: root.pendingRequestId >= 0,
         eq: root.eqStatus,
         bass_level: root.snapshot ? root.snapshot.bass_level : null,

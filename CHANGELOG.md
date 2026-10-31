@@ -2,6 +2,9 @@
 
 ## Unreleased — 0.1.0 release candidate
 
+- Add an app-like Play/Stop earbud search control with correct `0x8400`
+  acknowledgement handling, shared uncertain/confirmed state, per-device
+  50-second stop, close/shutdown cleanup, and device-bound queued commands.
 - Reuse the authenticated session for ANC strengths as well as main modes;
   Nord Buds 3 Pro Low/Moderate/High/Auto selection was observed after
   0.15–0.30 seconds instead of roughly 15 seconds. Verify Auto against its

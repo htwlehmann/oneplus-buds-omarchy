@@ -56,6 +56,8 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         "reconnect_count": snapshot.reconnect_count,
         "generation": snapshot.generation,
         "bass_level": snapshot.bass_level,
+        "find_state": snapshot.find_state,
+        "find_device_id": snapshot.find_device_id,
         "touch_controls": serialize_touch_controls(
             snapshot.touch_bindings, profile.touch_functions if profile else {},
             bool(profile and profile.verified and snapshot.session_connected)),
@@ -234,13 +236,19 @@ class BudsFrontendBridge:
                 result = self.controller.set_feature_switch(feature, enabled)
             elif command == "find_earbuds":
                 # Local fork: ring the earbuds to locate them.
-                self._require_parameters(command, params, {"ringing"})
+                self._require_parameters(command, params,
+                    {"ringing", "device_id"} if "device_id" in params else {"ringing"})
                 ringing = params["ringing"]
                 if not isinstance(ringing, bool):
                     raise ValueError(
                         "find_earbuds parameter 'ringing' must be a boolean"
                     )
-                result = self.controller.find_earbuds(ringing)
+                device_id = params.get("device_id")
+                if device_id is not None and (not isinstance(device_id, str)
+                        or re.fullmatch(r"[0-9a-f]{64}", device_id) is None):
+                    raise ValueError("find_earbuds device_id must be a snapshot device token")
+                result = self.controller.find_earbuds(ringing, device_id=device_id)
+                self._on_snapshot(self.controller.snapshot())
             elif command == "set_bass_level":
                 # Local fork: set the bass engine level ("BassWave").
                 self._require_parameters(command, params, {"level"})

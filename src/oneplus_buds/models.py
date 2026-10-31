@@ -142,3 +142,5 @@ class ControllerSnapshot:
     bass_level: int | None = None
     touch_bindings: tuple[TouchBinding, ...] = ()
     hold_cycle_mask: int | None = None
+    find_state: str = "stopped"
+    find_device_id: str | None = None

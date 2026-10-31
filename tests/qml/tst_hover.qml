@@ -16,6 +16,8 @@ TestCase {
   property string reportPath: ""
   property var touchRequest: null
   property var holdCycleRequest: null
+  property var findRequests: []
+  property var findDeviceIds: []
   property var queuedRequests: []
   function request(command, params) {
    queuedRequests = queuedRequests.concat([{command:command, parameters:params}])
@@ -27,6 +29,11 @@ TestCase {
   }
   function setHoldCycle(modes) {
    holdCycleRequest = modes.slice(); return nextId++
+  }
+  function findEarbuds(ringing, deviceId) {
+   findRequests = findRequests.concat([ringing])
+   findDeviceIds = findDeviceIds.concat([deviceId || ""])
+   return nextId++
   }
   function eqStatus() { eqStatusCalls++; return nextId++ }
   function setEq(value) { return nextId++ }
@@ -50,6 +57,7 @@ TestCase {
   function hideTooltip(item) {}
  }
  BarWidget { id: widget; bar: host; x: 200; y: 20; width: implicitWidth; height: implicitHeight }
+ Component { id: anotherWidget; BarWidget { bar: host } }
  function init() {
   service.connection = "connected"
   service.snapshot = ({status:{model:"Test buds",battery:{left:{percentage:80},right:{percentage:60}}},
@@ -61,6 +69,8 @@ TestCase {
   service.reportPath = ""
   service.touchRequest = null
   service.holdCycleRequest = null
+  service.findRequests = []
+  service.findDeviceIds = []
   service.queuedRequests = []
   widget.panelQueue = []
   host.panelAvailableWidth = 600
@@ -79,6 +89,105 @@ TestCase {
      writable:true,options:[{value:0,label:"None"},{value:6,label:"Next track"}]},
     {side:1,button:1,action:4,action_label:"Touch & hold",function:8,function_label:"Switch noise control",
      writable:false,options:[]}]}
+ }
+ function findSnapshot(state) {
+  return {status:{model:"Nord",battery:{}},anc_modes:[],
+   capabilities:["find_earbuds"],session_connected:true,compatibility:"verified",
+   find_state:state,find_device_id:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+ }
+ function test_find_play_stop_follow_confirmed_state_and_handle_rejection() {
+  service.snapshot = findSnapshot("stopped")
+  widget.popupOpen = true
+  var button = findChild(widget, "findEarbudsButton")
+  verify(button !== null)
+  var hint = findChild(widget, "findEarbudsHint")
+  verify(hint.text.indexOf("Remove earbuds") !== -1)
+  verify(button.text.indexOf("▶") !== -1)
+  button.clicked()
+  compare(service.findRequests, [true])
+  verify(!widget.finding)
+  verify(!button.enabled)
+  service.snapshot = findSnapshot("ringing")
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{acknowledged:true,state:"ringing"}}
+  wait(0)
+  verify(widget.finding && button.enabled)
+  compare(button.text, "■ Stop")
+  button.clicked()
+  compare(service.findRequests, [true,false])
+  service.snapshot = findSnapshot("unknown")
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{acknowledged:false,state:"unknown",set_status:14}}
+  wait(0)
+  compare(button.text, "■ Stop")
+  verify(widget.outcome.indexOf("not confirmed") !== -1)
+  verify(hint.text.indexOf("unknown") !== -1)
+  button.clicked()
+  service.snapshot = findSnapshot("stopped")
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{acknowledged:true,state:"stopped"}}
+  wait(0)
+  verify(!widget.finding)
+  verify(button.text.indexOf("▶") !== -1)
+ }
+ function test_find_unknown_start_and_panel_close_keep_stop_available() {
+  service.snapshot = findSnapshot("stopped")
+  widget.popupOpen = true
+  findChild(widget, "findEarbudsButton").clicked()
+  service.snapshot = findSnapshot("unknown")
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{acknowledged:false,state:"unknown",set_status:null}}
+  wait(0)
+  verify(widget.finding)
+  widget.close()
+  compare(service.findRequests, [true,false])
+  verify(widget.finding) // closing cannot establish remote silence
+  service.snapshot = findSnapshot("stopped")
+  verify(!widget.finding)
+ }
+ function test_find_close_during_start_queues_stop_and_reopen_uses_shared_state() {
+  service.snapshot = findSnapshot("stopped")
+  widget.popupOpen = true
+  findChild(widget, "findEarbudsButton").clicked()
+  widget.close()
+  compare(service.findRequests, [true,false])
+  service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
+   result:{acknowledged:true,state:"ringing"}}
+  service.snapshot = findSnapshot("ringing")
+  widget.popupOpen = true
+  compare(findChild(widget, "findEarbudsButton").text, "■ Stop")
+  service.connection = "disconnected"
+  verify(!findChild(widget, "findEarbudsButton").enabled)
+ }
+ function test_find_shared_state_expiry_and_destroyed_open_panel() {
+  service.snapshot = findSnapshot("stopped")
+  var other = createTemporaryObject(anotherWidget, this)
+  verify(other !== null)
+  widget.popupOpen = true
+  other.popupOpen = true
+  service.snapshot = findSnapshot("ringing")
+  compare(findChild(widget, "findEarbudsButton").text, "■ Stop")
+  compare(findChild(other, "findEarbudsButton").text, "■ Stop")
+  // An open view going away must stop the same owned search.
+  other.destroy()
+  wait(0)
+  compare(service.findRequests, [false])
+  // Automatic stop arrives as a snapshot, without a UI command response.
+  service.snapshot = findSnapshot("stopped")
+  verify(!widget.finding)
+  verify(findChild(widget, "findEarbudsButton").text.indexOf("▶") !== -1)
+ }
+ function test_find_close_after_device_switch_cancels_original_pending_start() {
+  service.snapshot = findSnapshot("stopped")
+  widget.popupOpen = true
+  findChild(widget, "findEarbudsButton").clicked()
+  var originalId = service.snapshot.find_device_id
+  var next = findSnapshot("stopped")
+  next.find_device_id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  service.snapshot = next
+  widget.close()
+  compare(service.findRequests, [true,false])
+  compare(service.findDeviceIds, [originalId,originalId])
  }
  function test_touch_controls_read_and_write_real_widget() {
   service.snapshot = touchSnapshot()

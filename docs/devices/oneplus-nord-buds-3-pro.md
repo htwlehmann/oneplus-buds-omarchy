@@ -197,6 +197,33 @@ echoes them back. The owner's unit reports the range `-10` to `+10`.
 
 `0x0400` with the payload `[01]` rings the earbuds, `[00]` stops the tone.
 
+The app's Play control becomes a stop action while playing (its graphic uses
+a pause symbol). `HeadsetCoreService.O0` sends the boolean as one byte; the
+app accepts status00 from `0x8400`, and `cb.d$f.Q` schedules a Stop after50s.
+REA wire Evidence: `ev_d75c730c05579cde8388db0785bfe978267338ef64d7fe81f2e4cdee057665a6`;
+Stop-state Evidence: `ev_c6e50983a7a76e5ae1c14028465acb85f26771650b67d9916da1ba6c61e0483e`.
+
+The plugin now renders `▶ Find my earbuds` / `■ Stop` from shared backend
+state, parses the find acknowledgement itself (the previous ANC-only parser
+discarded it), and keeps Stop available after an unconfirmed start/stop.
+The controller's per-device50s deadline attempts one automatic Stop. Closing
+or destroying an open panel also stops, including cancellation during a pending
+start. Graceful helper shutdown stops its owned search if the link is available.
+Queued commands carry a device token so recovery cannot redirect them to
+another pair. No uncertain start is automatically replayed.
+
+Live test on2026-10-31, with the owner confirming buds were in the open case
+and outside the ears: Start accepted with status00, frontend `ringing` after
+144.9ms; Stop sent0.35s later, accepted00 and `stopped` after142.7ms.
+No acoustic recording was made. Timeout, rejection,50s expiry and device
+replacement are covered by automated tests. The interface displays a short
+remove-earbuds hint; it does not yet read actual wearing status.
+The final device-bound version was additionally tested through actual native
+Play/Stop clicks: both returned status00, the panel showed Stop while active,
+and the final state was stopped without using the fallback stop command.
+The local REA export is
+`~/src/oneplus-buds-research/rea-find-earbuds-2026-10-31-evidence.json`.
+
 ## Touch controls (2026-10-28)
 
 The authenticated, payloadless query `0x0108` returns `0x8108` with

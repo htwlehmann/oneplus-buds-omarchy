@@ -136,8 +136,11 @@ Item {
     return request("set_bass_level", { level: Number(level) })
   }
 
-  function findEarbuds(ringing) {
-    return request("find_earbuds", { ringing: ringing !== false })
+  function findEarbuds(ringing, deviceId) {
+    var parameters = { ringing: ringing !== false }
+    var target = deviceId || (snapshot && snapshot.find_device_id)
+    if (target) parameters.device_id = String(target)
+    return request("find_earbuds", parameters)
   }
 
   onHelperPathChanged: startHelper()
