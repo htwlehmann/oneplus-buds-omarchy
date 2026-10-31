@@ -10,6 +10,10 @@
   re-selected. The `0x0418` action byte (1 create, 2 update, 3 delete) was
   verified on the Nord Buds 3 Pro, including a delete that restores the
   previous catalogue state.
+- Use the shell's `KeyboardPanel` instead of `PopupCard` so the panel owns the
+  keyboard while it is open. The old xdg-popup never delivered key events to
+  the name field, which made the new profile name impossible to type and the
+  profile impossible to create. The device rename field benefits as well.
 
 - Add an app-like Play/Stop earbud search control with correct `0x8400`
   acknowledgement handling, shared uncertain/confirmed state, per-device

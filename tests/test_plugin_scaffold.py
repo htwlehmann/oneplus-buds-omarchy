@@ -77,7 +77,7 @@ class PluginScaffoldTests(unittest.TestCase):
         self.assertIn("root.bar.barForeground", widget)
         self.assertIn("root.bar.fontFamily", widget)
         self.assertIn("root.bar.showTooltip", widget)
-        self.assertIn("PopupCard {", widget)
+        self.assertIn("KeyboardPanel {", widget)
         self.assertIn("delegate: Button {", widget)
         self.assertIn("budsService.setAnc(mode)", widget)
         self.assertIn("response.result.verified === true", widget)

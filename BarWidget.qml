@@ -440,7 +440,7 @@ BarWidget {
     profileRenameEntryId = -1
     outcome = ""
     customEqNameField.text = ""
-    Qt.callLater(function() { customEqNameField.forceActiveFocus() })
+    focusProfileNameField()
   }
 
   // Local fork: rename the profile that is selected in the dropdown.
@@ -451,10 +451,19 @@ BarWidget {
     profileNameDraft = String(selectedCustom.name || "")
     outcome = ""
     customEqNameField.text = profileNameDraft
+    focusProfileNameField()
+  }
+
+  // The panel owns the keyboard while it is open. The focused item inside
+  // the panel only receives the keys after it became the active focus item,
+  // so the name field asks for it explicitly and once more a moment later.
+  function focusProfileNameField() {
+    customEqNameField.forceActiveFocus()
     Qt.callLater(function() {
       customEqNameField.forceActiveFocus()
-      customEqNameField.selectAll()
+      if (root.profileNameMode === "rename") customEqNameField.selectAll()
     })
+    profileFocusTimer.restart()
   }
 
   function cancelProfileName() {
@@ -685,6 +694,18 @@ BarWidget {
     onTriggered: root.abandonPendingRequest()
   }
 
+  // Local fork: the popup needs a moment before the name field can take the
+  // keyboard focus.
+  Timer {
+    id: profileFocusTimer
+    interval: 150
+    repeat: false
+    onTriggered: {
+      if (root.profileNameMode === "") return
+      customEqNameField.forceActiveFocus()
+    }
+  }
+
   Item {
     anchors.fill: parent
     anchors.leftMargin: Style.space(7)
@@ -735,7 +756,12 @@ BarWidget {
     }
   }
 
-  PopupCard {
+  // Local fork: the panel is a KeyboardPanel, not a PopupCard. An xdg-popup
+  // only receives key events after a click routes the focus through its
+  // parent surface, so a name field inside it could not be typed into. The
+  // KeyboardPanel primes the layer-shell keyboard focus when it opens and
+  // hands the keys to the focused item inside the panel.
+  KeyboardPanel {
     id: popup
     anchorItem: root
     bar: root.bar
@@ -1039,6 +1065,9 @@ BarWidget {
                   width: parent.fieldWidth
                   height: Style.space(32)
                   visible: root.profileNameMode !== ""
+                  // The panel is an xdg-popup: it only owns the keyboard while
+                  // it has grabbed the focus, so the name field needs both.
+                  focus: root.profileNameMode !== ""
                   selectByMouse: true
                   font.family: root.bar.fontFamily
                   font.pixelSize: Style.font.bodySmall

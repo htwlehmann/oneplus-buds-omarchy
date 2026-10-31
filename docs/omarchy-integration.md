@@ -165,3 +165,13 @@ name field; Enter or the check button stores the name, the cross button
 cancels. Service createCustomEq/renameCustomEq use the same optional deviceId
 token as setCustomEq. The new profile is created in the next free device slot
 and the profile that was active before the write is re-selected afterwards.
+
+The panel uses the shell's `KeyboardPanel` instead of `PopupCard`. A
+`PopupCard` is an xdg-popup: it only receives key events after a click routes
+the focus through its parent surface, so the name field could not be typed
+into and the profile could not be created. `KeyboardPanel` is a layer-shell
+window that primes the keyboard focus when it opens, so the focused item
+inside the panel receives the keys. The name field asks for the active focus
+when an edit starts and retries once, because the panel needs a moment before
+the item can take the focus. The device rename field in the heading benefits
+from the same mechanism.

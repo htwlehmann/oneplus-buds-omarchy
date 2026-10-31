@@ -489,3 +489,12 @@ and a plus button (new profile) on the right. Both turn the dropdown into a
 name field; the plus button stores a new profile in the next free slot, the
 pencil renames the selected profile. The delete action exists in the backend
 and CLI to restore test states, but is not exposed in the panel.
+
+The name field needs the keyboard, so the panel uses the shell's
+`KeyboardPanel` (layer-shell with a keyboard focus prime) instead of the
+xdg-popup based `PopupCard`. With the popup, the field never received key
+events; with the keyboard panel the typed name reaches the field, Enter
+stores it and the profile appears in the catalogue. This was verified live on
+the owner's unit: typing `Rock` in the panel and pressing Enter created the
+profile as id 9 with a verified readback; the test profile was deleted
+afterwards.

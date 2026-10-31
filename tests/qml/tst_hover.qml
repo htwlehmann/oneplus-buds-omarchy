@@ -758,6 +758,14 @@ TestCase {
   verify(!selector.visible && field.visible)
   compare(first.text, "\u2715")
   compare(second.text, "\u2713")
+  // The name field must own the keyboard, otherwise it cannot be typed into.
+  verify(field.activeFocus)
+  keyPress(Qt.Key_R)
+  wait(0)
+  compare(field.text, "r")
+  compare(widget.profileNameDraft, "r")
+  keyRelease(Qt.Key_R)
+  field.text = ""
   widget.profileNameDraft = "Plugin Test"
   second.clicked()
   wait(0)
