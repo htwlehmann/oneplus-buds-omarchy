@@ -1029,8 +1029,7 @@ BarWidget {
 
           }
 
-          // Local fork: the phone app's feature switches and the
-          // find-my-earbuds tone.
+          // Local fork: the phone app's feature switches.
           Column {
             id: featuresColumn
             x: 0
@@ -1043,8 +1042,6 @@ BarWidget {
             width: parent.width
             spacing: Style.space(5)
             visible: root.featureSwitchesAvailable
-              || (snapshot && snapshot.capabilities
-                && snapshot.capabilities.indexOf("find_earbuds") !== -1)
 
             Text {
               width: parent.width
@@ -1088,49 +1085,6 @@ BarWidget {
                   opacity: modelData.writable ? 1.0 : 0.6
                   onToggled: root.toggleFeature(modelData.name, !modelData.enabled)
                 }
-              }
-            }
-
-            Column {
-              width: parent.width
-              spacing: Style.space(5)
-              visible: snapshot && snapshot.capabilities
-                && snapshot.capabilities.indexOf("find_earbuds") !== -1
-
-              Button {
-                objectName: "findEarbudsButton"
-                width: parent.width
-                height: Math.max(implicitHeight, Style.space(32))
-                text: root.finding ? "■ Stop" : "▶ Find my earbuds"
-                tooltipText: root.finding ? "" : "Remove earbuds before playing a sound."
-                selected: root.finding
-                bordered: true
-                leftAlign: true
-                enabled: root.connection === "connected" && snapshot
-                  && snapshot.session_connected === true && root.pendingRequestId < 0
-                opacity: enabled ? 1.0 : 0.5
-                foreground: root.bar.foreground
-                background: root.bar.background
-                accent: Color.accent
-                fontFamily: root.bar.fontFamily
-                onClicked: root.findEarbuds()
-              }
-
-              Text {
-                objectName: "findEarbudsHint"
-                visible: root.pendingKind === "find" || root.finding
-                width: parent.width
-                text: root.pendingKind === "find" ? (root.pendingMode === "find"
-                    ? "Starting sound…" : "Stopping sound…")
-                  : root.findState === "unknown" ? "Search status unknown. Use Stop to end the sound."
-                  : root.finding ? "Sound playing · automatic stop after 50 s."
-                  : ""
-                textFormat: Text.PlainText
-                color: root.bar.foreground
-                opacity: 0.7
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                wrapMode: Text.Wrap
               }
             }
           }
@@ -1365,6 +1319,62 @@ BarWidget {
             text: "Call gestures use the earbuds’ fixed settings."
             color: root.bar.foreground
             opacity: 0.6
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.Wrap
+          }
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(5)
+          visible: snapshot && snapshot.capabilities
+            && snapshot.capabilities.indexOf("find_earbuds") !== -1
+
+          Button {
+            id: findEarbudsButton
+            objectName: "findEarbudsButton"
+            width: parent.width
+            height: Math.max(implicitHeight, Style.space(32))
+            text: root.finding ? "Stop" : "Find my earbuds"
+            tooltipText: root.finding ? "" : "Remove earbuds before playing a sound."
+            selected: root.finding
+            bordered: true
+            leftAlign: true
+            enabled: root.connection === "connected" && snapshot
+              && snapshot.session_connected === true && root.pendingRequestId < 0
+            opacity: enabled ? 1.0 : 0.5
+            foreground: root.bar.foreground
+            background: root.bar.background
+            accent: Color.accent
+            fontFamily: root.bar.fontFamily
+            onClicked: root.findEarbuds()
+
+            Text {
+              objectName: "findEarbudsIcon"
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(12)
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.finding ? "■" : "▶"
+              textFormat: Text.PlainText
+              color: findEarbudsButton.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.body
+            }
+          }
+
+          Text {
+            objectName: "findEarbudsHint"
+            visible: root.pendingKind === "find" || root.finding
+            width: parent.width
+            text: root.pendingKind === "find" ? (root.pendingMode === "find"
+                ? "Starting sound…" : "Stopping sound…")
+              : root.findState === "unknown" ? "Search status unknown. Use Stop to end the sound."
+              : root.finding ? "Sound playing · automatic stop after 50 s."
+              : ""
+            textFormat: Text.PlainText
+            color: root.bar.foreground
+            opacity: 0.7
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.bodySmall
             wrapMode: Text.Wrap

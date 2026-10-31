@@ -118,7 +118,7 @@ TestCase {
   var hint = findChild(widget, "findEarbudsHint")
   verify(!hint.visible)
   verify(button.tooltipText.indexOf("Remove earbuds") !== -1)
-  verify(button.text.indexOf("▶") !== -1)
+  compare(findChild(widget, "findEarbudsIcon").text, "▶")
   button.clicked()
   compare(service.findRequests, [true])
   verify(!widget.finding)
@@ -128,7 +128,8 @@ TestCase {
    result:{acknowledged:true,state:"ringing"}}
   wait(0)
   verify(widget.finding && button.enabled)
-  compare(button.text, "■ Stop")
+  compare(button.text, "Stop")
+  compare(findChild(widget, "findEarbudsIcon").text, "■")
   compare(button.tooltipText, "")
   button.clicked()
   compare(service.findRequests, [true,false])
@@ -136,7 +137,8 @@ TestCase {
   service.lastResponse = {request_id:widget.pendingRequestId,ok:true,
    result:{acknowledged:false,state:"unknown",set_status:14}}
   wait(0)
-  compare(button.text, "■ Stop")
+  compare(button.text, "Stop")
+  compare(findChild(widget, "findEarbudsIcon").text, "■")
   verify(widget.outcome.indexOf("not confirmed") !== -1)
   verify(hint.text.indexOf("unknown") !== -1)
   button.clicked()
@@ -145,7 +147,7 @@ TestCase {
    result:{acknowledged:true,state:"stopped"}}
   wait(0)
   verify(!widget.finding)
-  verify(button.text.indexOf("▶") !== -1)
+  compare(findChild(widget, "findEarbudsIcon").text, "▶")
  }
  function test_find_unknown_start_and_panel_close_keep_stop_available() {
   service.snapshot = findSnapshot("stopped")
@@ -172,7 +174,8 @@ TestCase {
    result:{acknowledged:true,state:"ringing"}}
   service.snapshot = findSnapshot("ringing")
   widget.popupOpen = true
-  compare(findChild(widget, "findEarbudsButton").text, "■ Stop")
+  compare(findChild(widget, "findEarbudsButton").text, "Stop")
+  compare(findChild(widget, "findEarbudsIcon").text, "■")
   service.connection = "disconnected"
   verify(!findChild(widget, "findEarbudsButton").enabled)
  }
@@ -183,8 +186,10 @@ TestCase {
   widget.popupOpen = true
   other.popupOpen = true
   service.snapshot = findSnapshot("ringing")
-  compare(findChild(widget, "findEarbudsButton").text, "■ Stop")
-  compare(findChild(other, "findEarbudsButton").text, "■ Stop")
+  compare(findChild(widget, "findEarbudsButton").text, "Stop")
+  compare(findChild(widget, "findEarbudsIcon").text, "■")
+  compare(findChild(other, "findEarbudsButton").text, "Stop")
+  compare(findChild(other, "findEarbudsIcon").text, "■")
   // An open view going away must stop the same owned search.
   other.destroy()
   wait(0)
@@ -192,7 +197,7 @@ TestCase {
   // Automatic stop arrives as a snapshot, without a UI command response.
   service.snapshot = findSnapshot("stopped")
   verify(!widget.finding)
-  verify(findChild(widget, "findEarbudsButton").text.indexOf("▶") !== -1)
+  compare(findChild(widget, "findEarbudsIcon").text, "▶")
  }
  function test_find_close_after_device_switch_cancels_original_pending_start() {
   service.snapshot = findSnapshot("stopped")
