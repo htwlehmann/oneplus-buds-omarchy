@@ -663,6 +663,12 @@ TestCase {
   compare(widget.reportActionLabel, "Report compatibility")
   verify(widget.panelHeight <= 560)
 
+  service.snapshot = ({status:null, anc_modes:[], capabilities:[], session_connected:false,
+   compatibility:""})
+  wait(0)
+  verify(!widget.compatibilityNoticeShown)
+  verify(findChild(widget, "compatibilityNotice").visible === false)
+
   service.snapshot = ({status:{model:"Community model",product_id:"C0FFEE",battery:{}},
    compatibility:"community_tested", anc_modes:[], capabilities:[], session_connected:false})
   wait(0)

@@ -36,7 +36,7 @@ def serialize_snapshot(snapshot: ControllerSnapshot) -> JsonObject:
         "status": snapshot.status.to_dict() if snapshot.status is not None else None,
         "compatibility": compatibility_for_product(
             snapshot.status.product_id if snapshot.status else None
-        ),
+        ) if snapshot.status else "",
         "capabilities": sorted(capabilities),
         "anc_modes": sorted(profile.anc.write_indices) if profile and profile.verified else [],
         "anc_labels": dict(profile.anc.level_labels) if profile else {},

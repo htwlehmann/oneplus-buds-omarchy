@@ -33,7 +33,10 @@ BarWidget {
   readonly property string reportDialogSelectedFile: String(reportFileDialog.selectedFile || "")
   readonly property bool experimentalDevice: compatibilityKind === "experimental"
   readonly property bool communityTestedDevice: compatibilityKind === "community_tested"
-  readonly property bool compatibilityNoticeShown: experimentalDevice || communityTestedDevice
+  // Without a known device there is nothing to call experimental, so the
+  // notice stays hidden while nothing is connected.
+  readonly property bool compatibilityNoticeShown: !!(snapshot && snapshot.status)
+    && (experimentalDevice || communityTestedDevice)
   readonly property bool reportAvailable: connection === "connected"
     && snapshot !== null && snapshot.status !== null
   readonly property bool reportActionShown: reportAvailable && !reportDetailsOpen

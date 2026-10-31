@@ -95,6 +95,11 @@ class BridgeTests(unittest.TestCase):
             if product_id not in {"060C14", "062014", "064414"}
         ))
 
+    def test_without_a_connected_device_the_compatibility_is_unknown(self):
+        payload = serialize_snapshot(replace(SNAPSHOT, status=None))
+        self.assertEqual(payload["compatibility"], "")
+        self.assertEqual(payload["status"], None)
+
     def test_unknown_recognised_product_is_experimental(self):
         unknown = replace(STATUS, product_id="A1B2C3", model=None)
         payload = serialize_snapshot(replace(SNAPSHOT, status=unknown))
