@@ -25,7 +25,6 @@ model's profile. Upstream has no maintainer verification for this product.
 The Bluetooth address is deliberately not recorded.
 
 ## Case battery (correction, 2026-10-31)
-
 The owner confirmed that the phone shows the case level when the buds are
 inside the open case and connected. The earlier removal in `99bc02a` inferred
 missing hardware support from an unavailable zero reading; that inference
@@ -39,6 +38,22 @@ the minimum level as 1, and `ui/widget/MelodyBatteryViews.java:a()` hides
 levels <= 0. Case support is restored in the Nord profile. The plugin queries
 battery state every ten seconds while connected and accepts case levels
 1..100. Missing, zero, or invalid case samples keep the last valid level.
+
+### Charging with the buds in the open case (2026-10-31)
+
+Measured live on the owner's unit with both buds in the case and the lid
+open: the buds stay powered, so the RFCOMM session remains open and the
+plugin reads fresh values instead of the cache. The raw `0x0106` answer was
+`00 03 01 46 02 46 03 e4`: left and right at 70% **without** a charging
+contact, the case at 100% **with** one (0xe4 = 100% + charging bit).
+
+On this model the earbuds therefore only charge with the lid closed; the case
+charges on its own from USB while the lid is open. Whether the earbuds charge
+with an open lid is a property of the device, not of the plugin: the panel
+only shows the charging bit that the earbuds report (as the upstream Buds Pro 2
+screenshot does with its `L 100%`/`R 100%` lightning marks). With the lid
+closed the earbuds power down, the connection drops and the panel falls back
+to the last known values.
 
 The bridge saves the last level separately for each product and physical
 device in `$XDG_CACHE_HOME/oneplus-buds/case-battery/` (default `~/.cache/…`),
