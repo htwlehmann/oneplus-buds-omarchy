@@ -55,6 +55,39 @@ screenshot does with its `L 100%`/`R 100%` lightning marks). With the lid
 closed the earbuds power down, the connection drops and the panel falls back
 to the last known values.
 
+### App-side battery and charging semantics (REA/JADX, 2026-10-31)
+
+The phone app's own interpretation of the battery answer was checked against
+the shipped APK (Wireless Earphones 17.6.6, `com.oplus.melody`, SHA256
+`ed75c8f4…768641`). Export: `~/src/oneplus-buds-research/rea-battery-charging-2026-10-31-evidence.json`
+(9 records, JADX headless 0.7.1; the MCP server of that session had no
+`REA_JADX_MCP_JAR`, so the commands ran through the REA CLI with the same
+provider and artifact).
+
+- `btsdk/api/data/BatteryInfo` decodes every pair exactly like the plugin:
+  `mLevel = value & 127` (`MASK_BATTERY_LEVEL`), `mCharging = (value & 128) != 0`
+  (`MASK_CHARGING_STATE`), component id taken verbatim from the answer.
+  `btsdk/protocol/commands/d` parses `count` plus that many
+  `(component, value)` pairs. Evidence `ev_3beda959ea282bf88cb6567ed0911dff46f22a4cec84b5a4fba903ac7f7dcfb8`.
+- `BatteryInfo.fixBattery(level, radix, component)` is new compared with the
+  plugin: the app rounds the level **up** to the next multiple of the model's
+  `batteryRadix` (10 when the model table has none), maps 0 to invalid (a case
+  level of 1 stays 1) and caps at 100. The Nord's model table defines no
+  `batteryRadix`, so a device value such as 72% is shown as 80% by the app
+  while the plugin shows the raw value. Evidence
+  `ev_fc1752a522f01fd0734943931801a055dbbc90141ec128438fd6170092c6aebd` and
+  `ev_e42c33e3a00f0e7906a3741a1fea1ff117b9a222d788bdbf6a5f01eaea323c2e`.
+- The app knows no "buds in the case" state for this model: the model table
+  has an `inBoxStatus` flag per device, which switches the app from the
+  battery path to the ear-status path when deciding whether the earbuds are
+  connected (`model/repository/earphone/G`). The decrypted model table for
+  `064414` does not set `inBoxStatus`, so the app only ever shows the
+  charging bit per component - it cannot tell an open case from a closed one.
+- `ui/widget/MelodyBatteryViews` renders the battery: a level of 0 hides the
+  whole row, a charging flag shows the lightning image, otherwise the
+  percentage is shown, and at 20% or below a red progress bar replaces it.
+  Evidence `ev_d277e9b4b592b90d9a20d005b12593a68153ec50f5a6ea9a77a73601cb359c8b`.
+
 The bridge saves the last level separately for each product and physical
 device in `$XDG_CACHE_HOME/oneplus-buds/case-battery/` (default `~/.cache/…`),
 using hashed filenames and atomic replacement. Remembered values carry
