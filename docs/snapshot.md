@@ -67,13 +67,44 @@ All commands below are for an existing Omarchy graphical session. Run this Bash
 block **from the restored source checkout**, after the checks above pass. It
 backs up an existing plugin outside the discovery directory and exports only
 source/runtime files. A second copy under `~/.config/omarchy/plugins/` would have
-the same ID and must not be used as a backup.
+the same ID and must not be used as a backup. Before running the block, note
+its current bar section for rollback. The example enables the snapshot on the
+right; change `--section right` if you want another section.
+
+The block checks raw manifests (including symlinked plugin directories) before
+any disable/move/export, because a catalog may already hide duplicate IDs. A
+same-ID copy under another name, an unreadable manifest or a symlink at the
+canonical destination requires manual inspection; it is not moved automatically.
 
 ```bash
 bash <<'SH'
 set -eu
 snapshot_plugin_dir="$HOME/.config/omarchy/plugins/oneplus-buds.control"
 snapshot_backup_root="$HOME/.local/state/oneplus-buds/plugin-backups"
+python3 - "$snapshot_plugin_dir" <<'PYGUARD'
+import json
+from pathlib import Path
+import sys
+
+target = Path(sys.argv[1])
+if target.is_symlink() or (target.exists() and not target.is_dir()):
+    raise SystemExit("Inspect the destination first: it is a symlink or not a directory.")
+children = target.parent.iterdir() if target.parent.exists() else []
+for child in children:
+    manifest = child / "manifest.json"
+    if not manifest.is_file():
+        if child == target:
+            raise SystemExit("Existing destination has no manifest; inspect it before replacing it.")
+        continue
+    try:
+        plugin_id = json.loads(manifest.read_text(encoding="utf-8-sig"))["id"]
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise SystemExit(f"Cannot inspect {manifest}; fix this before installing.") from error
+    if child == target and plugin_id != "oneplus-buds.control":
+        raise SystemExit("Existing destination belongs to another plugin; inspect it first.")
+    if child != target and plugin_id == "oneplus-buds.control":
+        raise SystemExit(f"Existing same-ID plugin at {child}; resolve it before installing.")
+PYGUARD
 if [ -e "$snapshot_plugin_dir" ]; then
   omarchy plugin disable oneplus-buds.control
   mkdir -p "$snapshot_backup_root"

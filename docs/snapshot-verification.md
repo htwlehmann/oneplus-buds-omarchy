@@ -39,6 +39,13 @@ Final verification on the prepared checkout:
 | `git diff --check` | Passed |
 | User preview | Original 767×1200 PNG copied byte-for-byte, empty metadata |
 
+A fresh independent review identified a duplicate-ID gap in the install recipe.
+The guarded recipe was then exercised with real temporary filesystem exports
+and mocked shell enable/disable/rescan: new install, existing canonical install,
+alternative same-ID directory, canonical symlink and alternative same-ID symlink.
+The three ambiguous cases abort before any mutation; the existing copy is
+preserved outside discovery. No real plugin installation was moved.
+
 Final tag/bundle verification is performed after the preparation commit. The
 bundle restore check is also recorded in the private backup directory so the
 final tag need not be moved just to include its own commit hash.
