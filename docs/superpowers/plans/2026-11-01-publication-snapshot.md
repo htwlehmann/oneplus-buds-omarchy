@@ -28,7 +28,7 @@
 - [x] 1. Capture source/upstream commits, independent checkout and clean baseline; inspect current files and all added history blobs for sensitive material.
 - [x] 2. Correct README, CHANGELOG, compatibility, fork/publication docs and repository metadata. Add pinned restore instructions, factual research provenance and local contribution scopes. Keep runtime unchanged.
 - [x] 3. Use the owner-provided native preview unmodified, including the system bar as explicitly requested. Run full Python/Qt suites, dependency check, validator, clean export and CLI checks; record exact environment and audit scope.
-- [ ] 4. Obtain one fresh final review, address material findings, commit and annotate the snapshot tag. Verify an offline bundle by cloning and validating it; confirm installed source is unchanged. Leave all publication actions pending.
+- [x] 4. Obtain one fresh final review, address material findings, commit and annotate the snapshot tag. Verify an offline bundle by cloning and validating it; confirm installed source is unchanged. Leave all publication actions pending.
 
 Documentation changes do not require new implementation-mirroring tests; existing
 behaviour/packaging tests and explicit restoration checks are the acceptance gates.
