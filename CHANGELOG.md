@@ -1,6 +1,28 @@
 # Changelog
 
-## Unreleased — 0.1.0 release candidate
+## Personal snapshot — nord-buds-3-pro-2026-11-01
+
+This fork preserves the owner-tested Nord work on top of upstream `abe70f4`.
+Package metadata remains `0.1.0`; this is not an official upstream release.
+The dated snapshot tag is prepared locally; see `docs/publication.md`.
+
+- Add the owner-tested Nord profile with Low/Moderate/High/Auto, three named
+  presets, custom curves, six audited feature switches, touch assignment and
+  the shared hold cycle; unknown products gain no write permissions.
+- Reuse the ANC session for strengths, handle Auto confirmation, and remember
+  the last valid case battery without retaining an old charging flag.
+- Add Find Play/Stop, uncertain-state Stop, a 50-second best-effort stop and
+  same-pair identity protection for queued writes/recovery.
+- Replace gain fields with a themed curve editor that saves on changed release.
+- Use Omarchy Dropdown for EQ/touch, retain device-confirmed touch selection,
+  and balance feature switches across two columns.
+- Prepare pinned restoration, offline backup and contribution documentation;
+  correct earlier Nord support claims and retain original MIT attribution.
+
+### Earlier local development entries
+
+These entries retain intermediate development states. The snapshot summary above
+and current compatibility matrix supersede their earlier capability assumptions.
 
 - Create and rename custom EQ profiles like the phone app: the profile
   dropdown is shortened and gets a pencil button (rename) and a plus button
@@ -87,4 +109,5 @@
 - Publication documentation, MIT license, dependency preflight, checkout-local
   CLI launcher and clean plugin exporter.
 
-No public release or marketplace listing has been made.
+The original plugin is already listed in the Marketplace. The fork snapshot is
+not a separate listing and is not covered by the original snapshot verification.

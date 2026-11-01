@@ -1,234 +1,168 @@
 # OnePlus Buds Control for Omarchy
 
-A native Omarchy bar widget and Linux backend for OnePlus earbuds. Check battery
-levels and change noise control from a compact, theme-aware panel.
+A native Omarchy bar widget and Linux backend for OnePlus earbuds, originally
+created by [Gaz](https://github.com/GazzasaurusRex/oneplus-buds-omarchy).
+This personal snapshot preserves Jörg Lehmann's owner-tested additions for the
+**OnePlus Nord Buds 3 Pro** and makes them available for upstream contributions.
+It is independent of OnePlus/OPPO and comes with no ongoing maintenance commitment.
 
-**Status: 0.1.0 release candidate.** Buds Pro and Buds Pro 2 have hardware-verified
-basic controls and native EQ. No release tag has been created yet. This is an
-independent project, unaffiliated with OnePlus or OPPO.
+The snapshot identifier is **`nord-buds-3-pro-2026-11-01`**. Package metadata stays
+at upstream's `0.1.0`; the dated Git tag identifies this fork's exact source.
+Repository URLs below become available when the prepared fork is published.
+This fork is not a separate Marketplace listing. The existing
+[Marketplace entry](https://plugins.omarchy.org/plugin.html?id=oneplus-buds.control)
+installs the original project, not this snapshot.
+
+![Nord Buds 3 Pro panel with the custom EQ curve and themed profile dropdown](preview.png)
 
 ## What works
 
-- Automatic selection of one connected compatible OnePlus/OPPO device.
-- Connection status, left/right battery, case battery when returned, and firmware.
-- Independently verified ANC On, Off, Transparency and profile-supported strengths.
-- Model-correct native earbud EQ presets on both models, plus device-defined custom EQ on Pro 2.
-- Icon-only idle widget; hover reveals known batteries, with delayed collapse.
-- Responsive panel with full-width device status, balanced ANC/EQ columns when
-  space permits, and a compact scrolling fallback on narrow displays.
-- A privacy-safe diagnostic report for compatibility investigations.
+- Connection status, component batteries and firmware when the device reports it.
+- Model-specific noise control and ANC strengths, with fresh state verification.
+- Native earbud EQ presets; device-defined custom curves on supported models.
+- A theme-aware panel with two columns when space permits, scrolling on narrow
+  screens, and separate collapsible Custom EQ and Touch controls sections.
+- A user-controlled diagnostic report saved locally, with no automatic upload.
 
-| Device | Evidence | Tested firmware | ANC strengths |
+Additional functions tested on the owner's **Nord Buds 3 Pro**:
+
+| Function | Observed behaviour / limits |
+|---|---|
+| ANC | Off, Transparency, Noise cancellation; Low, Moderate, High, Auto. Warm changes reuse the session; cold connection setup can still take seconds. |
+| Earbud EQ | Balanced (Default), Serenade, Bass. Six-band custom curve editor saves on changed pointer/key release and verifies the result. |
+| Custom profiles | Create, rename and delete with confirmation; three slots on the tested firmware. Create/rename restore the previously active profile. |
+| BassWave | On/off and a device-defined bass level. |
+| Other switches | Personalised noise cancellation, Auto play/pause, Camera control, Dual connection, Hi-Res mode. Set/read-back was tested; actual camera, player and codec behaviour was not measured. |
+| Touch controls | Left/right single, double, triple tap and long hold; shared noise-control hold cycle with at least two selected modes. Call gestures retain the device defaults. |
+| Find my earbuds | Play/Stop, Stop retained after an uncertain command, best-effort automatic stop after 50 seconds and when the panel closes. Command acceptance was confirmed; there is no reliable in-ear guard. |
+| Case battery | Remembers the last valid level across reconnects/restarts. `*` and the tooltip identify a cached sample; old charging flags are not retained. The case reports while the buds are inside the open case and connected. |
+
+Remove the buds from your ears before starting a search sound. Camera control is
+for a compatible phone camera; it does not integrate with Linux camera apps.
+Dual connection and Hi-Res changes may disconnect/reconnect Bluetooth. Hi-Res
+requires a compatible audio host and does not prove a particular Linux codec.
+Phone-side OnePlus 3D Audio, Golden Sound and ANC calibration are not implemented.
+
+## Device evidence
+
+| Device | Evidence origin | Recorded firmware | ANC strength labels |
 |---|---|---|---|
-| OnePlus Buds Pro | Verified on hardware | 541.541.510 | Light, Deep, Smart |
-| OnePlus Buds Pro 2 | Verified on hardware | 196.196.101 | Light, Medium, Deep, Smart |
-| OnePlus Nord Buds 3 Pro | Verified on owner hardware | 155.155.101 | Light, Medium, Deep |
-| Other compatible OnePlus/OPO devices | Experimental if recognised; no verified controls | Unknown | Not exposed |
+| OnePlus Buds Pro | Upstream maintainer's historical hardware tests | 541.541.510 | Light, Deep, Smart |
+| OnePlus Buds Pro 2 | Upstream maintainer's historical hardware tests | 196.196.101 | Light, Medium, Deep, Smart |
+| OnePlus Nord Buds 3 Pro (`064414`) | This fork owner's hardware, October 2026 | 155.155.101 | Low, Moderate, High, Auto |
+| Other recognised OnePlus/OPO devices | Experimental; no inherited write permission | Unknown | Not exposed |
 
-See [compatibility and limitations](docs/devices/compatibility.md). Gestures,
-spatial audio and other HeyMelody features are not implemented controls.
-
-## Compatibility and reports
-
-OnePlus Buds Pro and Buds Pro 2 are the only models currently hardware-verified
-by the maintainer. Other recognised OnePlus/OPO-compatible models are
-**Experimental** until tested. A model may become **Community Tested** after an
-owner reports successful, reproducible checks on their own hardware; that label
-does not mean maintainer hardware verification.
-
-This local fork additionally carries an owner-verified profile for the
-**OnePlus Nord Buds 3 Pro** (`064414`), measured on the owner's own unit. Its ANC
-bitmap matches the Buds Pro 2, but it has no Smart strength and publishes an
-empty native EQ catalogue, so only the seven factory EQ slots are offered. See
-the [device record](docs/devices/oneplus-nord-buds-3-pro.md).
-
-Every connected device has a quiet reporting link at the bottom of the control
-panel. Verified and Community Tested devices show **Report a problem**;
-Experimental devices show **Report compatibility** beneath their compatibility
-notice. All use the same workflow: the panel explains the report contents, proposes
-a safe `.txt` filename, lets you choose where to save it, and never uploads it.
-After saving, open the [compatibility report template](https://github.com/GazzasaurusRex/oneplus-buds-omarchy/issues/new?template=compatibility.md)
-and attach the reviewed report yourself. Reports covering detection, battery, ANC,
-Transparency and EQ are welcome even when everything works.
+The new controls are not assumed to work on other models. The snapshot's complete
+unit/UI suites pass, but Pro and Pro 2 have not been physically retested with this
+fork. See the [compatibility matrix](docs/devices/compatibility.md) and
+[Nord device record](docs/devices/oneplus-nord-buds-3-pro.md).
+The current backend uses `verified` for the locally tested Nord write gate; that
+is an owner test, not hardware verification by Gaz or Marketplace verification.
 
 ## Requirements
 
-Live-tested with Omarchy **4.0.2-1** and **4.0.3-1**, its
-Quickshell/Quattro shell, BlueZ 5.87 and Python 3.14.7. Python 3.11+ is required;
-older Python releases have not been tested here.
-The native widget needs Omarchy's `qs.Ui` and `qs.Commons` modules, not a standalone
-Quickshell session. Other desktop environments can use the CLI only.
+The Nord snapshot was exercised with **Omarchy 4.0.6-1**, Quickshell
+`0.3.2.r7.g2b4501a-1`, Qt 6.12.0, BlueZ 5.87 and system Python 3.14.8.
+It uses Omarchy's `qs.Ui`/`qs.Commons`, including `KeyboardPanel`, `Dropdown`,
+`ConfirmDialog`, `PanelSlider` and `ToggleSwitch`. Earlier Omarchy releases were
+used by upstream; this snapshot's compatibility with them is not established.
+Python 3.11+ is the backend floor; other Python versions were not retested here.
+A standalone Quickshell session does not provide the required Omarchy modules.
 
-Runtime dependencies are system Python, `python-dbus`, BlueZ and the running
-Omarchy shell. `bluez-utils` provides Bluetooth setup/diagnostic commands. No PyPI
-packages, separate daemon, root access or audio-configuration changes are needed
-for normal operation. Check prerequisites from this checkout:
+Runtime dependencies: system Python, `python-dbus`, BlueZ, `bluez-utils` and the
+running Omarchy shell. There are no PyPI runtime packages, install hooks,
+additional daemon or system audio configuration changes. The read-only preflight
+checks basic prerequisites, not shell API compatibility or earbud support:
 
 ```bash
 python3 scripts/check_dependencies.py
 systemctl is-active bluetooth
 ```
 
-If the binding is missing on Omarchy, `omarchy pkg add python-dbus` installs the
-Arch package and may request administrator authorization. Use system Python;
-isolated virtual environments generally do not see that binding. The preflight
-checks availability only and does not connect to the earbuds.
+If needed, `omarchy pkg add python-dbus` installs the system binding and may ask
+for administrator authorization. Python virtual environments may not see it.
 
-## Install and remove
+## Install, restore and remove
 
-Install from GitHub using Omarchy's supported installer:
+For this exact snapshot use the [pinned restoration instructions](docs/snapshot.md).
+They also cover an existing installation, offline Git-bundle restoration and
+rollback. Do not install two copies with the same `oneplus-buds.control` ID.
+Ordinary Git installation from the fork follows its current default branch, not
+the dated tag; the restoration instructions deliberately use a pinned export.
 
-```bash
-omarchy plugin add https://github.com/GazzasaurusRex/oneplus-buds-omarchy.git
-python3 "$HOME/.config/omarchy/plugins/oneplus-buds.control/scripts/check_dependencies.py"
-omarchy plugin enable oneplus-buds.control --section right
-```
-
-If the installer offers to enable immediately, decline until the dependency check
-passes. This is a release candidate; no tagged release is available yet.
-
-For an existing local checkout, copy it into the user plugin directory without
-Git internals or caches. The destination must not already exist:
-
-```bash
-python3 scripts/export_plugin.py "$HOME/.config/omarchy/plugins/oneplus-buds.control"
-omarchy plugin validate "$HOME/.config/omarchy/plugins/oneplus-buds.control"
-omarchy-shell shell rescanPlugins
-omarchy plugin enable oneplus-buds.control --section right
-```
-
-The exporter writes only to the new destination. Enabling uses Omarchy's supported
-layout API; it does not replace your shell configuration. Run these commands inside
-your existing Omarchy graphical session. Do not start another Quickshell instance.
-
-See [publication notes](docs/publication.md) for release and marketplace status.
-Installation has no dependency hook, so run the dependency check before enabling.
-
-To stop the helper and hide the widget:
+The original project remains installable through the Marketplace or its own
+GitHub URL. Those commands do not install these Nord additions until upstream
+accepts them. Local preparation/publication status is in
+[publication notes](docs/publication.md).
 
 ```bash
 omarchy plugin disable oneplus-buds.control
-```
-
-To remove it:
-
-```bash
+# To remove it later (Omarchy asks for confirmation):
 omarchy plugin remove oneplus-buds.control
 ```
 
-Omarchy asks for confirmation; it backs up a copied directory or removes a
-Git-managed installation. This does not unpair earbuds or change their last ANC
-mode. Removal affects the plugin's layout entry, not unrelated bar settings.
+Removing the plugin does not unpair the buds or reset their stored settings.
+Keep a backup before replacing a modified installation.
 
-## Use
+## Use and diagnostics
 
-Pair and connect your earbuds through Omarchy's Bluetooth panel first. This plugin
-does not pair devices or connect audio. Keep only one compatible device connected
-when using the bar; multi-device selection currently exists only in the CLI.
+Pair/connect through Omarchy's Bluetooth panel first. The plugin selects one
+connected compatible device; explicit multi-device selection is CLI-only.
+Hover the bar icon for batteries and click to open the panel. Controls follow
+read-back state; a pending or failed write is not reported as verified.
+EQ is stored in the earbuds, independently of Linux's audio route.
 
-Hover the earbuds icon to see available battery values. Click anywhere on the
-expanded widget to open the panel. Noise control and ANC strength appear only when
-supported. Selected controls reflect read-back state. A pending request is shown
-until verified; an acknowledgement alone never produces a success message.
-
-`▶ Find my earbuds` starts the search tone; `■ Stop` ends it. Remove the buds
-from your ears before starting (also noted in the Play button tooltip). Search command acceptance is confirmed through
-the device acknowledgement; an unconfirmed result keeps Stop available. The
-plugin attempts to stop after50seconds and when its panel closes.
-
-Custom EQ opens a curve editor with draggable band points. Values snap to the
-device's dB steps; releasing a changed point saves the complete curve and checks
-it against the earbuds. Up/Down also adjusts a focused point and saves on key
-release. Selecting a saved custom curve activates it. The graph uses the current
-Omarchy accent and a fill fading to transparent. Editing is disabled during a
-save, when disconnected, or when the model does not support custom-EQ writes.
-
-Wear the earbuds for ANC tests: devices in their case may reject changes. Main
-ANC On may choose a device-dependent strength; select a specific strength if you
-need one. Cold setup still takes several seconds. Warm mode and strength changes
-reuse the authenticated session. The Nord Buds 3 Pro's Low/Moderate/High/Auto
-selection was observed in the frontend after 0.15–0.30 seconds; see the
-[device measurements](docs/devices/oneplus-nord-buds-3-pro.md#anc-latency-correction-2026-10-31)
-and [reference-model timing notes](docs/measurements/anc-baseline.md).
-Native EQ controls live only in the opened panel. Both models show verified
-factory presets; Pro 2 also shows controls generated from its returned custom-band
-definition. Changes are written to the earbuds and persist independently of the
-Linux audio route—no system-wide software EQ is installed or configured.
-The tested Pro 2 firmware labels its presets Balanced, Bass, Serenade, Bold, and
-Hans Zimmer Soundscape Tuning; the original Buds Pro retains its own four names.
-Connection startup uses BlueZ availability notifications while retaining bounded
-retry fallback; both models' phase-by-phase results are in the
-[connection lifecycle measurements](docs/measurements/connection-lifecycle.md).
-
-## CLI and diagnostic reports
-
-The included executable needs no package installation. **Disable the plugin before
-running CLI queries or diagnostics**: both use the device's single RFCOMM control
-channel. Re-enable afterward to resume monitoring.
+The device has one RFCOMM control channel. Disable the plugin before using the
+standalone CLI, then re-enable it afterwards:
 
 ```bash
 omarchy plugin disable oneplus-buds.control
-./oneplus-buds devices
 ./oneplus-buds status
 ./oneplus-buds anc status
-./oneplus-buds eq status
 ./oneplus-buds eq list
-./oneplus-buds eq set balanced
 ./oneplus-buds diagnostics --report
 omarchy plugin enable oneplus-buds.control --section right
 ```
 
-Use `./oneplus-buds --help` for all commands. Explicit selection puts
-`--device ADDRESS` before the command. `devices` prints Bluetooth addresses for
-selection; do not paste it into public issues. The panel report uses the already
-connected service and does not alter earbud state. The CLI report is the fallback
-when the panel is unavailable. Both omit Bluetooth addresses, device aliases,
-user/host identity, home paths, credentials, unrelated devices and raw packets.
-Review any report before sharing it. See [CLI details](docs/backend-cli.md).
+`./oneplus-buds --help` lists all commands. `--device ADDRESS` precedes the
+command. Do not share Bluetooth addresses printed by `devices` or raw captures.
+The panel report uses the existing session, saves to a chosen local `.txt` file,
+and omits addresses, device aliases, user/home identity and raw packets.
+Review reports before sharing. The panel's issue link still targets upstream;
+this preparation does not redirect the runtime workflow or imply that Gaz
+supports every fork-specific feature. See [CLI details](docs/backend-cli.md).
 
-## Troubleshooting
+If disconnected, check Bluetooth and close competing earbud-control clients.
+For ANC tests take the buds out of the case and wear them; the device may reject
+changes otherwise. For an absent case battery, put both buds in the open case
+while connected and allow the ten-second polling interval. A cached case level
+is deliberately marked. See [integration notes](docs/omarchy-integration.md)
+for development-only QML caching and lifecycle details.
 
-- **Disconnected icon:** connect earbuds in the Bluetooth panel, check the daemon,
-  and ensure only one compatible device is connected. Recovery backs off to 30 s.
-- **Missing dbus binding:** run the preflight with system Python and install
-  `python-dbus`; pip-only environments are not sufficient.
-- **Busy control channel:** disable this plugin before CLI/hardware tools. Also
-  close other earbud-control applications; do not restart Bluetooth unnecessarily.
-- **ANC change fails:** take both earbuds out of the case, wear them and retry.
-  The UI keeps failure visible rather than assuming a change succeeded.
-- **Case battery absent:** the case must first report a valid level (on the Nord
-  Buds 3 Pro, put the buds inside the open case while connected). Battery state
-  is queried every ten seconds. The plugin remembers the last valid case level
-  across reconnects and shell restarts; `*` and "last known" in the tooltip mark
-  a cached value when the current response omits it or reports an invalid level.
-  Remembered values do not retain an old charging indicator.
-- **A physical gesture is not reflected immediately:** notification payload mapping
-  is incomplete. Reopening the popup alone does not query fresh hardware state.
-  For a fresh check, disable the plugin, query with the CLI, then re-enable it.
-- **Widget fails to load:** validate the installed folder and inspect shell logs for
-  plugin-specific errors. During development, a unique exported source path may be
-  needed because the long-running shell caches QML URLs. See the [integration notes](docs/omarchy-integration.md).
-
-## Development
-
-The backend separates BlueZ discovery, RFCOMM transport, OPO framing, profiles,
-features, typed APIs, serialized session ownership and the frontend bridge. QML
-owns presentation and one child-process helper; protocol code stays in Python.
-See [architecture](docs/backend-api.md), [bridge](docs/frontend-bridge.md),
-[protocol](docs/protocols/OPOv1.md) and [contributing](CONTRIBUTING.md).
+## Development and contributions
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests
 python3 tests/run_qml_hover.py
+python3 scripts/check_dependencies.py
 omarchy plugin validate .
+git diff --check
 ```
 
-Node runs the JavaScript model checks when available. Qt 6 `qmltestrunner` is needed
-for the offscreen UI check, which stubs shell services and never contacts hardware.
-The Python package metadata is for backend-only distribution; the Omarchy plugin
-uses the full repository/export, not a wheel. Building a wheel separately requires
-setuptools >=77; that is not a plugin runtime dependency.
+Node enables JavaScript model tests; Qt 6 `qmltestrunner` enables the offscreen
+UI suite, which uses fake shell services and never contacts earbuds. Full
+restoration/packaging checks are recorded in [snapshot verification](docs/snapshot-verification.md).
+The Omarchy plugin is distributed as this source tree, not a Python wheel.
+Wheel building is a separate path requiring setuptools >=77 and is not validated
+by the source-export check.
+
+See [architecture](docs/backend-api.md), [bridge](docs/frontend-bridge.md),
+[protocol](docs/protocols/OPOv1.md), [contribution scopes](docs/upstream-contribution.md)
+and [CONTRIBUTING](CONTRIBUTING.md). The intent is to offer the measured work
+upstream, not to establish a second maintained product.
 
 ## License
 
-MIT; see [LICENSE](LICENSE) and [research provenance](docs/research/open-source.md).
+MIT; original copyright notice retained in [LICENSE](LICENSE).
+See [research provenance](docs/research/open-source.md). APKs, decompiled app
+sources and the private research workspace are not distributed in this repository.

@@ -3,8 +3,8 @@
   "id": "oneplus-buds.control",
   "name": "OnePlus Buds Control",
   "version": "0.1.0",
-  "author": "Gaz",
-  "description": "Native OnePlus earbuds controls for Omarchy. Hardware verified on OnePlus Buds Pro and Buds Pro 2; other compatible OnePlus/OPO devices are experimental.",
+  "author": "Gaz and contributors",
+  "description": "Native OnePlus earbuds controls for Omarchy, with owner-tested Nord Buds 3 Pro ANC, EQ, touch and feature controls. Pro/Pro 2 evidence comes from upstream.",
   "kinds": [
     "service",
     "bar-widget"
@@ -16,12 +16,12 @@
   },
   "barWidget": {
     "displayName": "OnePlus Buds",
-    "description": "Controls for Buds Pro and Buds Pro 2; other compatible OnePlus/OPO devices are experimental.",
+    "description": "Earbud controls with model-specific permissions and owner-tested Nord Buds 3 Pro support.",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right"
   },
   "license": "MIT",
-  "repository": "https://github.com/GazzasaurusRex/oneplus-buds-omarchy",
-  "homepage": "https://github.com/GazzasaurusRex/oneplus-buds-omarchy"
+  "repository": "https://github.com/htwlehmann/oneplus-buds-omarchy",
+  "homepage": "https://github.com/htwlehmann/oneplus-buds-omarchy"
 }

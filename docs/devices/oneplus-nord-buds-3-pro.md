@@ -4,6 +4,16 @@ Compatibility status: **Verified on real hardware** by the plugin owner, 2026-10
 This record was produced by measuring one unit locally, not by copying another
 model's profile. Upstream has no maintainer verification for this product.
 
+## Current snapshot summary (2026-11-01)
+
+The dated sections below preserve the investigation history; later corrections
+supersede earlier conclusions. Current support is Low/Moderate/High/Auto, three
+named factory presets, six-band custom EQ with three profile slots, six audited
+feature switches, touch assignments/hold cycle, Find Play/Stop and cached case
+battery. See the [current matrix](compatibility.md) for scope and limitations.
+No physical Pro/Pro 2 retest is implied. Private REA exports referenced below are
+not shipped; installation and offline tests need only this repository.
+
 ## Verified locally
 
 - BlueZ name: `OnePlus Nord Buds 3 Pro`
@@ -47,19 +57,17 @@ plugin reads fresh values instead of the cache. The raw `0x0106` answer was
 `00 03 01 46 02 46 03 e4`: left and right at 70% **without** a charging
 contact, the case at 100% **with** one (0xe4 = 100% + charging bit).
 
-On this model the earbuds therefore only charge with the lid closed; the case
-charges on its own from USB while the lid is open. Whether the earbuds charge
-with an open lid is a property of the device, not of the plugin: the panel
-only shows the charging bit that the earbuds report (as the upstream Buds Pro 2
-screenshot does with its `L 100%`/`R 100%` lightning marks). With the lid
-closed the earbuds power down, the connection drops and the panel falls back
-to the last known values.
+This sample reports the case as charging and neither earbud as charging. It
+does not by itself prove a general lid-dependent charging rule. The panel shows
+the charging bit reported by the device (as the upstream Buds Pro 2 screenshot
+does with its lightning marks). In the owner's observed closed-lid state the
+connection dropped and the panel fell back to its last known values.
 
 ### App-side battery and charging semantics (REA/JADX, 2026-10-31)
 
 The phone app's own interpretation of the battery answer was checked against
 the shipped APK (Wireless Earphones 17.6.6, `com.oplus.melody`, SHA256
-`ed75c8f4…768641`). Export: `~/src/oneplus-buds-research/rea-battery-charging-2026-10-31-evidence.json`
+`ed75c8f4…768641`). Export: `rea-battery-charging-2026-10-31-evidence.json`
 (9 records, JADX headless 0.7.1; the MCP server of that session had no
 `REA_JADX_MCP_JAR`, so the commands ran through the REA CLI with the same
 provider and artifact).
@@ -194,7 +202,7 @@ App sources: `model/repository/earphone/G.java:t0/u0`,
 `btsdk/protocol/commands/k.java:h/s/M`, and `commands/f.java:b`.
 REA serialization Evidence: `ev_21005fcdf65e6dda1bc26c9b20786664d8cd4f668ed6439b8a0227faa3ff917d`;
 notification parser: `ev_24393d69618b7bf35d0357ccd9e1f5b068ec58369462de6bf1e3c82d99d69574`.
-The local export is `~/src/oneplus-buds-research/rea-anc-app-audit-2026-10-31-evidence.json`.
+The local export is `rea-anc-app-audit-2026-10-31-evidence.json`.
 HeyMelody 117.6.6 was not supplied and has not been compared.
 Sanitized hardware records: [ANC latency measurement](../measurements/2026-10-31-nord-anc-latency.json).
 
@@ -366,7 +374,7 @@ The final device-bound version was additionally tested through actual native
 Play/Stop clicks: both returned status00, the panel showed Stop while active,
 and the final state was stopped without using the fallback stop command.
 The local REA export is
-`~/src/oneplus-buds-research/rea-find-earbuds-2026-10-31-evidence.json`.
+`rea-find-earbuds-2026-10-31-evidence.json`.
 
 ## Touch controls (2026-10-28)
 

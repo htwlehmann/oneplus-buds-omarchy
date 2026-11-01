@@ -28,3 +28,20 @@ Publication provenance review (2026-09-07): the project uses the installed Omarc
 QML APIs and system dbus-python at runtime; neither dependency is vendored. Protocol
 research and sanitized hardware observations are documented above. No third-party
 source or raster assets are bundled. The original project files are licensed MIT.
+
+## Nord app comparison (October 2026)
+
+The owner also inspected Wireless Earphones **17.6.6**, Android package
+`com.oplus.melody`, SHA256
+`ed75c8f4ad06ebdb2100477b6db75c49931c2514127f390b259b6bff8c768641`.
+This is not HeyMelody 117.6.6 (`com.heytap.headset`), which was not analysed.
+The public Nord device record describes command layouts, resource-label facts,
+capability interpretation and independently measured SET/read-back results.
+The APK, decrypted device table, decompiled app source, and private REA workspace
+are not bundled. Evidence IDs in historical notes identify the owner's research
+records; they are not downloadable files shipped with this snapshot. Installing
+and running the offline tests needs none of those external artifacts.
+
+The new runtime implementation and screenshot are project-authored work; app
+code and app graphics are not copied into the plugin. Copyright (c) 2026 Gaz and
+contributors remains in LICENSE, with the fork contribution attributed in README.
