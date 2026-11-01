@@ -1,12 +1,15 @@
-# Fork publication preparation
+# Fork publication
 
-Prepared locally on **2026-11-01**. No remote fork, push, GitHub release, pull
-request or Marketplace submission is created by this preparation.
+Prepared and published on **2026-11-01** as the public fork
+https://github.com/htwlehmann/oneplus-buds-omarchy . The initial `main` and the
+annotated snapshot tag both identify `2433c3fe57faf790f741ea1ae8a3b60e61a0670c`.
+Later publication-status documentation on `main` does not move that fixed tag.
+No GitHub release, pull request or Marketplace submission was created.
 
 | Item | Prepared value |
 |---|---|
 | Original project | https://github.com/GazzasaurusRex/oneplus-buds-omarchy |
-| Intended GitHub fork | https://github.com/htwlehmann/oneplus-buds-omarchy |
+| Published GitHub fork | https://github.com/htwlehmann/oneplus-buds-omarchy |
 | Working branch | `prepare/publication` |
 | Snapshot tag | `nord-buds-3-pro-2026-11-01` |
 | Runtime source | `dd3a1032fc802b6aedba2a8045364252c0240966` |
@@ -20,7 +23,7 @@ package version `0.1.0` alone does not distinguish it from upstream.
 Fork metadata identifies its own repository, while runtime issue links remain
 upstream to preserve behaviour. No new upstream release number is invented.
 
-## What is ready for review
+## Published snapshot contents
 
 - Current model/function descriptions with owner evidence distinguished from
   upstream maintainer hardware tests; physical Pro/Pro 2 retesting is not claimed.
@@ -31,19 +34,24 @@ upstream to preserve behaviour. No new upstream release number is invented.
 - [Contribution scopes](upstream-contribution.md), including the open Buds 4
   write-permission policy that must be coordinated before proposing a Nord PR.
 
-## Proposed external actions — not executed
+## Publication commands
 
-Only after review, create the public GitHub fork without changing the local
-remotes, then publish the prepared branch as its default `main` and the single
-snapshot tag:
+The public fork was created without changing local remotes, and the prepared
+branch and single snapshot tag were published together. Equivalent commands for
+a new fork are shown below; they are not instructions to republish or move the
+existing snapshot tag:
 
 ```bash
-gh repo fork GazzasaurusRex/oneplus-buds-omarchy --clone=false --remote=false
-git push origin prepare/publication:main
-git push origin refs/tags/nord-buds-3-pro-2026-11-01
+gh repo fork GazzasaurusRex/oneplus-buds-omarchy --clone=false
+git push --atomic origin prepare/publication:main refs/tags/nord-buds-3-pro-2026-11-01
 ```
 
-Before executing, confirm `gh api user --jq .login` is `htwlehmann`, that `origin`
+The installed GitHub CLI rejects `--remote=false` when an explicit repository
+argument is supplied; `--clone=false` is sufficient here. Git also needs an HTTPS
+credential helper. The publication used the existing `gh auth git-credential`
+helper for that command only, without changing global Git configuration.
+
+Before executing any future push, confirm `gh api user --jq .login` is `htwlehmann`, that `origin`
 is the intended fork and `upstream` is the original, and fetch/check the actual
 fork main. A new fork should still have the recorded upstream ancestry. The
 pushes are ordinary fast-forwards; if someone has changed the fork, inspect that

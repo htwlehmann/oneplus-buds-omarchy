@@ -8,7 +8,7 @@ It is independent of OnePlus/OPPO and comes with no ongoing maintenance commitme
 
 The snapshot identifier is **`nord-buds-3-pro-2026-11-01`**. Package metadata stays
 at upstream's `0.1.0`; the dated Git tag identifies this fork's exact source.
-Repository URLs below become available when the prepared fork is published.
+The public fork and fixed snapshot tag were published on 2026-11-01.
 This fork is not a separate Marketplace listing. The existing
 [Marketplace entry](https://plugins.omarchy.org/plugin.html?id=oneplus-buds.control)
 installs the original project, not this snapshot.
